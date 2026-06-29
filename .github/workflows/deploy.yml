@@ -22,13 +22,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci
-      - run: npm run build
-      # serve under /wallpaper/ sub-path of the `sandbox` repo Pages; redirect /sandbox/ -> /sandbox/wallpaper/
-      - run: |
-          mkdir -p _site/wallpaper
-          cp -r dist/. _site/wallpaper/
-          printf '<!doctype html><meta http-equiv="refresh" content="0; url=./wallpaper/">' > _site/index.html
+
+      # wallpaper = the Vite React app (3-scene astronomy) -> /sandbox/wallpaper/
+      - name: Build wallpaper (Vite)
+        run: cd wallpaper && npm ci && npm run build
+
+      # assemble the multi-section hub: home at /sandbox/ + wallpaper sub-path
+      - name: Assemble _site
+        run: |
+          mkdir -p _site
+          cp home/index.html _site/index.html
+          cp -r wallpaper/dist _site/wallpaper
+          # (blog -> _site/blog and rainbow -> _site/rainbow added later, #29/#30)
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true

@@ -1,0 +1,761 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>sandbox — dohyun-jose-kim</title>
+<meta name="description" content="A sunset sandbox of web experiments. Drag the toys, pick a corner to play.">
+<style>
+  :root{
+    /* ---- sunset (day) palette ---- */
+    --sky-0:#ff4d2e; --sky-1:#ff7a3d; --sky-2:#ffa969; --sky-3:#ffd2a0;
+    --sun:#fff1cf;
+    --sand-top:#ffe1a6; --sand-2:#f6c476; --sand-3:#e2a458; --sand-sh:#c5853f;
+    --wood-oak:#d98a4e; --wood-l:#e8b07a; --wood-m:#c0764a; --wood-d:#9c5a30; --wood-edge:#7a3413;
+    --pink:#ff3d8b; --pink-d:#c41e63; --pink-x:#8c1146;
+    --teal:#1fc6c6; --teal-d:#0d8d8d;
+    --cream:#fff4e8; --ink:#5d2a14; --muted:#b06a2e;
+    --contact:#7a3413;
+    /* ---- avatar themeable fills (day defaults; .night overrides below) ---- */
+    --av-hoodie:#ffcf4d; --av-torso:#f3ece0; --av-hair:#5a3a22;
+    --av-pants:#2b3d63; --av-shoe:#ffffff; --av-skin:#f4d9c0; --av-cheek:#ff9a8a; --av-eye:#3a2a1e;  /* --av-pants = cap navy */
+    --font:"SF Pro Rounded", ui-rounded, "Quicksand", "Hiragino Maru Gothic Pro", system-ui, -apple-system, sans-serif;
+  }
+  /* ---- night palette (toggle) ---- */
+  .sb-stage.night{
+    --sky-0:#10162e; --sky-1:#1d2547; --sky-2:#2c3460; --sky-3:#46406e;
+    --sun:#cdd6ff;
+    --av-hoodie:#e0b53e; --av-torso:#cfc8bd; --av-hair:#4a2f1c; --av-pants:#1c2a44;
+    --av-shoe:#e8e8ee; --av-skin:#e4cab2; --av-cheek:#d97a6e; --av-eye:#2e2016;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  .sb-stage{
+    position:relative; width:100%; min-height:100svh; overflow:hidden;
+    font-family:var(--font); color:var(--cream); touch-action:manipulation;
+    background:
+      radial-gradient(120% 90% at 62% 8%, var(--sun) 0%, rgba(255,241,207,0) 42%),
+      linear-gradient(178deg, var(--sky-0) 0%, var(--sky-1) 34%, var(--sky-2) 64%, var(--sky-3) 100%);
+    -webkit-font-smoothing:antialiased; isolation:isolate;
+    transition:background .8s ease;
+  }
+  .sb-sun{
+    position:absolute; top:6%; left:62%; width:190px; height:190px; transform:translate(-50%,0);
+    border-radius:50%;
+    background:radial-gradient(circle at 50% 50%, var(--sun) 0%, #ffe9b0 38%, rgba(255,224,150,0) 70%);
+    filter:blur(2px); z-index:0; pointer-events:none;
+    animation:sb-sun 9s ease-in-out infinite;
+  }
+  .night .sb-sun{ background:radial-gradient(circle at 50% 50%, #f3f6ff 0%, #c7d2ff 40%, rgba(180,195,255,0) 72%); }
+  .night .sb-diorama{ filter:brightness(.9) saturate(.95); }  /* gently cool the warm props to harmonize with the night sky */
+  @keyframes sb-sun{50%{opacity:.78; transform:translate(-50%,4px) scale(1.04)}}
+
+  /* stars — night only */
+  .sb-stars{position:absolute; inset:0; z-index:0; pointer-events:none; opacity:0; transition:opacity .8s ease}
+  .night .sb-stars{opacity:1}
+  .sb-star{position:absolute; width:3px; height:3px; border-radius:50%; background:#fff;
+    box-shadow:0 0 6px #cdd6ff; animation:sb-twinkle 3s ease-in-out infinite}
+
+  .sb-motes{position:absolute; inset:0; z-index:1; pointer-events:none}
+  .sb-mote{position:absolute; width:6px; height:6px; border-radius:50%;
+    background:radial-gradient(circle,var(--sun),rgba(255,247,223,0)); opacity:.55;
+    animation:sb-mote 14s linear infinite}
+  @keyframes sb-mote{
+    0%{transform:translateY(20px) translateX(0); opacity:0}
+    12%{opacity:.6} 88%{opacity:.5}
+    100%{transform:translateY(-120px) translateX(26px); opacity:0}
+  }
+
+  /* ---- top bar ---- */
+  .sb-eyebrow{
+    position:absolute; top:26px; left:30px; z-index:6;
+    font-size:13px; font-weight:700; letter-spacing:.16em; text-transform:uppercase;
+    color:#fff; text-shadow:0 1px 3px rgba(110,38,12,.7), 0 0 2px rgba(110,38,12,.6);
+  }
+  .sb-eyebrow b{opacity:.82; font-weight:600}
+  .sb-topright{position:absolute; top:22px; right:24px; z-index:6; display:flex; align-items:center; gap:10px}
+  .sb-pill{
+    display:flex; align-items:center; gap:7px;
+    padding:6px 12px; border-radius:999px; font-size:12px; font-weight:700; letter-spacing:.1em;
+    text-transform:uppercase; color:#fff;
+    background:rgba(122,52,19,.42); backdrop-filter:blur(3px);
+    box-shadow:inset 0 0 0 1px rgba(255,244,232,.25);
+  }
+  .night .sb-pill{background:rgba(10,16,40,.5)}
+  .sb-dot{width:8px; height:8px; border-radius:50%; background:#8fff7a; box-shadow:0 0 8px #8fff7a; animation:sb-blink 2.4s ease-in-out infinite}
+  @keyframes sb-blink{50%{opacity:.4}}
+  .sb-toggle{
+    cursor:pointer; border:none; width:38px; height:38px; border-radius:50%; font-size:18px; line-height:1;
+    color:#fff; background:rgba(122,52,19,.42); backdrop-filter:blur(3px);
+    box-shadow:inset 0 0 0 1px rgba(255,244,232,.25); transition:transform .3s, background .4s;
+  }
+  .sb-toggle:hover{transform:scale(1.08) rotate(-12deg)}
+  .night .sb-toggle{background:rgba(10,16,40,.5)}
+
+  /* ---- scene ---- */
+  .sb-scene{
+    position:relative; z-index:2; width:100%; min-height:100svh;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:54px 12px 36px;
+  }
+  .sb-diorama-wrap{ width:min(97vw, 1280px); perspective:1300px; }
+  .sb-diorama{
+    width:100%; height:auto; display:block; overflow:visible;
+    transition:transform .25s ease-out; will-change:transform;
+    animation:sb-enter 1s cubic-bezier(.2,.8,.25,1) backwards;  /* backwards (not both): don't keep filling transform → parallax inline transform applies after entry */
+  }
+  @keyframes sb-enter{from{opacity:0; transform:translateY(26px) scale(.96)} to{opacity:1; transform:none}}
+
+  /* ---- props (bookshelf / desk = nav) ---- */
+  .sb-item, .sb-sub{cursor:pointer; outline:none}
+  .sb-item-pos{touch-action:none}        /* the container is the drag surface; claim the gesture so touch-drag isn't stolen */
+  .sb-item .lift, .sb-sub .lift{ transition:transform .42s cubic-bezier(.2,.9,.2,1); transform-box:fill-box; transform-origin:50% 100% }
+  .sb-item:hover .lift, .sb-item:focus-visible .lift,
+  .sb-sub:hover .lift, .sb-sub:focus-visible .lift{ transform:translateY(-16px) scale(1.03) }
+  .sb-item .propshadow, .sb-item .propshadow{ transition:transform .42s ease, opacity .42s ease; transform-box:fill-box; transform-origin:50% 50% }
+  .sb-item:hover .propshadow, .sb-item:focus-visible .propshadow{ transform:scale(1.18); opacity:.16 }
+
+  /* entry drop + idle bob for toys */
+  .sb-item .drop{ animation:sb-drop .9s cubic-bezier(.34,1.56,.5,1) both; animation-delay:calc(.55s + var(--i,0)*.13s) }
+  @keyframes sb-drop{from{transform:translateY(-130px); opacity:0} 60%{opacity:1} to{transform:translateY(0)}}
+  .sb-item .bob{ animation:sb-bob 4.4s ease-in-out infinite; animation-delay:calc(var(--i,0)*.55s) }
+  @keyframes sb-bob{50%{transform:translateY(-5px)}}
+  /* while dragging: kill idle bob, lift & enlarge shadow, no transition on the moving group */
+  .sb-item.dragging .bob{ animation:none }
+  .sb-item.dragging .lift, .sb-sub.dragging .lift{ transition:none; transform:translateY(-14px) scale(1.08) }
+  .sb-item.dragging .propshadow{ transition:none; transform:scale(1.4); opacity:.12 }
+  .sb-item-pos{ will-change:transform }
+
+  /* hover signposts */
+  .sb-tag{
+    transition:transform .32s cubic-bezier(.2,.9,.2,1), opacity .3s;
+    transform-box:fill-box; transform-origin:50% 100%; opacity:0;
+    filter:drop-shadow(0 3px 5px rgba(120,50,10,.32)); pointer-events:none;
+  }
+  .sb-item:hover .sb-tag, .sb-item:focus-visible .sb-tag,
+  .sb-sub:hover .sb-tag, .sb-sub:focus-visible .sb-tag{ transform:translateY(-6px) scale(1.04); opacity:1 }
+  .sb-tag-bg{fill:var(--cream)}
+  .sb-tag-tx{font-weight:800; letter-spacing:.02em; font-size:16px; fill:var(--ink); font-family:var(--font)}
+  .sb-tag-soon{font-weight:700; font-size:13px; letter-spacing:.04em; fill:var(--muted); font-family:var(--font)}
+  .sb-tag-arrow{fill:var(--pink); font-weight:900}
+  /* soon-reject feedback: pops the signpost up (so it's visible even on touch where there's no hover) and jiggles it */
+  .sb-tag.sb-shake{animation:sb-shake .55s ease}
+  @keyframes sb-shake{
+    0%{opacity:1; transform:translateY(-6px) scale(1.04)}
+    25%{opacity:1; transform:translateY(-6px) scale(1.04) translateX(-5px)}
+    75%{opacity:1; transform:translateY(-6px) scale(1.04) translateX(5px)}
+    100%{opacity:1; transform:translateY(-6px) scale(1.04)}
+  }
+
+  /* sand divots (drag trail) */
+  .sb-divot{pointer-events:none; animation:sb-divot 4.5s ease-out forwards}
+  @keyframes sb-divot{from{opacity:.85} to{opacity:0}}
+
+  .ring{opacity:0; transition:opacity .2s}
+  .sb-item:focus-visible .ring, .sb-sub:focus-visible .ring{ opacity:1 }
+
+  .sb-star{transform-box:fill-box; transform-origin:50% 50%}
+  @keyframes sb-twinkle{0%,100%{transform:scale(.5); opacity:.25} 50%{transform:scale(1); opacity:1}}
+
+  /* ---- wordmark ---- */
+  .sb-wordmark{
+    margin:6px 0 0; position:relative; z-index:3; font-family:var(--font);
+    font-weight:900; font-size:clamp(44px, 9.5vw, 104px); line-height:.9;
+    letter-spacing:-.01em; color:var(--pink); text-transform:uppercase; text-align:center;
+    transform:skewX(-3deg);
+    text-shadow:
+      1px 1px 0 var(--pink-d), 2px 2px 0 var(--pink-d), 3px 3px 0 var(--pink-d),
+      4px 5px 0 var(--pink-x), 5px 6px 0 var(--pink-x), 6px 7px 0 var(--pink-x),
+      7px 8px 0 var(--pink-x), 8px 10px 0 var(--pink-x),
+      0 16px 26px rgba(120,20,60,.42);
+    animation:sb-pop 1s cubic-bezier(.2,.9,.25,1.2) .35s both;
+  }
+  @keyframes sb-pop{from{opacity:0; transform:skewX(-3deg) translateY(30px) scale(.9)} to{opacity:1; transform:skewX(-3deg) translateY(0) scale(1)}}
+  .sb-tagline{
+    margin:16px 0 0; z-index:3; text-align:center; max-width:40ch;
+    font-size:clamp(14px,1.7vw,17px); font-weight:600; line-height:1.5;
+    color:#fff; text-shadow:0 1px 4px rgba(90,42,20,.85), 0 0 3px rgba(90,42,20,.6);
+    animation:sb-fade 1s ease .8s both;
+  }
+  .sb-tagline .ko{display:block; margin-top:4px; font-size:.86em; opacity:.82; font-weight:500}
+  @keyframes sb-fade{from{opacity:0; transform:translateY(10px)} to{opacity:1}}
+
+  @media (max-width:640px){
+    .sb-eyebrow{font-size:10.5px; letter-spacing:.07em; top:18px; left:16px}
+    .sb-topright{top:14px; right:12px; gap:7px}
+    .sb-pill{font-size:10px; padding:5px 9px}
+    .sb-toggle{width:32px; height:32px; font-size:15px}
+    .sb-scene{padding-top:46px}
+  }
+  /* short / landscape viewports: don't center+clip — top-align and allow scroll so the wordmark survives */
+  @media (max-height:560px){
+    .sb-stage{overflow-y:auto}
+    .sb-scene{justify-content:flex-start; min-height:auto; padding-top:58px; padding-bottom:28px}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .sb-sun,.sb-mote,.sb-dot,.sb-star,.sb-diorama,.sb-wordmark,.sb-tagline,
+    .sb-item .drop,.sb-item .bob,.sb-tag.sb-shake{animation:none}
+    .sb-diorama{transition:none}
+    .sb-wordmark{transform:skewX(-3deg)}
+  }
+</style>
+
+<div class="sb-stage" id="sbStage">
+  <div class="sb-sun"></div>
+  <div class="sb-stars" id="sbStars"></div>
+  <div class="sb-motes" id="sbMotes"></div>
+
+  <div class="sb-eyebrow">dohyun-jose-kim <b>/ sandbox</b></div>
+  <div class="sb-topright">
+    <div class="sb-pill"><span class="sb-dot"></span> live</div>
+    <button class="sb-toggle" id="sbToggle" aria-label="Toggle day / night" title="Toggle day / night">☀️</button>
+  </div>
+
+  <div class="sb-scene">
+    <div class="sb-diorama-wrap">
+    <svg class="sb-diorama" id="sbDiorama" viewBox="0 150 1360 600" role="img" aria-labelledby="sbTitle">
+      <title id="sbTitle">A sunset sandbox: a bookshelf, a sandbox with toys, and a desk. Each opens a web experiment.</title>
+
+      <!-- ground shadow wash -->
+      <ellipse cx="680" cy="694" rx="660" ry="62" fill="#7a3413" opacity=".10"/>
+
+      <!-- ================= BOOKSHELF (left) — container drags; each compartment hover/click/label ================= -->
+      <g class="sb-item-pos" data-item="bookshelf" transform="translate(10,180)">
+        <ellipse class="propshadow" cx="180" cy="462" rx="160" ry="22" fill="#7a3413" opacity="0.26"/>
+        <!-- FRAME (static carcass; drag-only, not individually interactive) -->
+        <polygon points="40,150 150,150 168,138 58,138" fill="#e8b07a"/>
+        <polygon points="150,150 168,138 168,238 150,250" fill="#9c5a30"/>
+        <polygon points="210,118 320,118 338,106 228,106" fill="#f0bd86"/>
+        <polygon points="320,118 338,106 338,250 320,262" fill="#9c5a30"/>
+        <polygon points="40,250 320,250 338,238 58,238" fill="#e8b07a"/>
+        <polygon points="320,250 338,238 338,348 320,360" fill="#9c5a30"/>
+        <polygon points="50,360 320,360 338,348 68,348" fill="#e8b07a"/>
+        <polygon points="320,360 338,348 338,452 320,464" fill="#9c5a30"/>
+        <rect x="40" y="150" width="110" height="100" rx="6" fill="#d98a4e"/>
+        <rect x="210" y="118" width="110" height="144" rx="6" fill="#d98a4e"/>
+        <rect x="40" y="250" width="280" height="110" rx="6" fill="#d98a4e"/>
+        <rect x="50" y="360" width="270" height="104" rx="6" fill="#d98a4e"/>
+        <rect x="48" y="158" width="94" height="84" rx="4" fill="#6b3a1c"/>
+        <rect x="218" y="126" width="94" height="128" rx="4" fill="#6b3a1c"/>
+        <rect x="48" y="258" width="120" height="94" rx="4" fill="#6b3a1c"/>
+        <rect x="184" y="258" width="128" height="94" rx="4" fill="#6b3a1c"/>
+        <rect x="58" y="368" width="80" height="88" rx="4" fill="#6b3a1c"/>
+        <rect x="150" y="368" width="86" height="88" rx="4" fill="#6b3a1c"/>
+        <rect x="248" y="368" width="64" height="88" rx="4" fill="#6b3a1c"/>
+        <rect x="48" y="158" width="94" height="10" rx="4" fill="#7a3413" opacity="0.5"/>
+        <rect x="218" y="126" width="94" height="10" rx="4" fill="#7a3413" opacity="0.5"/>
+        <rect x="210" y="118" width="110" height="6" rx="3" fill="#ffd2a0" opacity="0.55"/>
+        <rect x="40" y="250" width="280" height="5" rx="2" fill="#ffd2a0" opacity="0.4"/>
+        <rect x="314" y="118" width="6" height="144" rx="3" fill="#ffd2a0" opacity="0.45"/>
+        <!-- COMPARTMENT 1 — top-left (clock) -->
+        <a class="sb-sub sb-soon" aria-label="Clock — coming soon">
+          <rect x="48" y="158" width="94" height="84" fill="transparent" pointer-events="all"/>
+          <g class="lift">
+            <rect x="54" y="186" width="13" height="56" rx="2" fill="#ffd23d"/>
+            <rect x="68" y="190" width="12" height="52" rx="2" fill="#1fc6c6"/>
+            <rect x="81" y="184" width="13" height="58" rx="2" fill="#fff4e8"/>
+            <rect x="95" y="192" width="11" height="50" rx="2" fill="#c0764a"/>
+            <rect x="108" y="184" width="13" height="58" rx="2" fill="#ff3d8b" transform="rotate(11 114 213)"/>
+            <circle cx="132" cy="222" r="12" fill="#fff4e8"/>
+            <circle cx="132" cy="222" r="12" fill="none" stroke="#9c5a30" stroke-width="3"/>
+            <line x1="132" y1="222" x2="132" y2="215" stroke="#5d2a14" stroke-width="2" stroke-linecap="round"/>
+            <line x1="132" y1="222" x2="137" y2="224" stroke="#5d2a14" stroke-width="2" stroke-linecap="round"/>
+          </g>
+          <rect class="ring" x="44" y="154" width="102" height="92" rx="8" fill="none" stroke="#fff" stroke-width="3"/>
+          <g transform="translate(95,131)"><g class="sb-tag"><rect class="sb-tag-bg" x="-54" y="-18" width="108" height="36" rx="12"/><polygon class="sb-tag-bg" points="-7,18 7,18 0,27"/><text x="0" y="6" text-anchor="middle"><tspan class="sb-tag-tx">Clock</tspan><tspan class="sb-tag-soon"> · soon</tspan></text></g></g>
+        </a>
+        <!-- COMPARTMENT 2 — top-right (plant) -->
+        <a class="sb-sub sb-soon" aria-label="Plant — coming soon">
+          <rect x="218" y="126" width="94" height="128" fill="transparent" pointer-events="all"/>
+          <g class="lift">
+            <rect x="224" y="200" width="13" height="54" rx="2" fill="#5bb8e6"/>
+            <rect x="238" y="196" width="12" height="58" rx="2" fill="#fff4e8"/>
+            <rect x="251" y="204" width="12" height="50" rx="2" fill="#c41e63"/>
+            <path d="M280 240 h26 l-4 14 h-18 z" fill="#e8b07a"/>
+            <path d="M280 240 h26 l-2 7 h-22 z" fill="#ffd2a0"/>
+            <ellipse cx="285" cy="218" rx="9" ry="18" fill="#6fcf6f" transform="rotate(-22 285 218)"/>
+            <ellipse cx="298" cy="214" rx="9" ry="20" fill="#6fcf6f" transform="rotate(10 298 214)"/>
+            <ellipse cx="292" cy="208" rx="8" ry="17" fill="#8ad98a" transform="rotate(-4 292 208)"/>
+          </g>
+          <rect class="ring" x="214" y="122" width="102" height="136" rx="8" fill="none" stroke="#fff" stroke-width="3"/>
+          <g transform="translate(265,99)"><g class="sb-tag"><rect class="sb-tag-bg" x="-52" y="-18" width="104" height="36" rx="12"/><polygon class="sb-tag-bg" points="-7,18 7,18 0,27"/><text x="0" y="6" text-anchor="middle"><tspan class="sb-tag-tx">Plant</tspan><tspan class="sb-tag-soon"> · soon</tspan></text></g></g>
+        </a>
+        <!-- COMPARTMENT 3 — mid-left (books + jar) -->
+        <a class="sb-sub sb-soon" aria-label="Books — coming soon">
+          <rect x="48" y="258" width="120" height="94" fill="transparent" pointer-events="all"/>
+          <g class="lift">
+            <rect x="56" y="288" width="14" height="62" rx="2" fill="#1fc6c6"/>
+            <rect x="71" y="282" width="13" height="68" rx="2" fill="#ffd23d"/>
+            <rect x="85" y="290" width="13" height="60" rx="2" fill="#fff4e8"/>
+            <rect x="99" y="286" width="12" height="64" rx="2" fill="#ff3d8b"/>
+            <rect x="112" y="294" width="12" height="56" rx="2" fill="#9c5a30"/>
+            <rect x="126" y="290" width="13" height="60" rx="2" fill="#5bb8e6" transform="rotate(9 132 320)"/>
+            <rect x="148" y="324" width="16" height="26" rx="4" fill="#fff4e8" opacity="0.85"/>
+            <rect x="151" y="320" width="10" height="6" rx="2" fill="#c0764a"/>
+          </g>
+          <rect class="ring" x="44" y="254" width="128" height="102" rx="8" fill="none" stroke="#fff" stroke-width="3"/>
+          <g transform="translate(108,231)"><g class="sb-tag"><rect class="sb-tag-bg" x="-54" y="-18" width="108" height="36" rx="12"/><polygon class="sb-tag-bg" points="-7,18 7,18 0,27"/><text x="0" y="6" text-anchor="middle"><tspan class="sb-tag-tx">Books</tspan><tspan class="sb-tag-soon"> · soon</tspan></text></g></g>
+        </a>
+        <!-- COMPARTMENT 4 — mid-right (vintage phone) -->
+        <a class="sb-sub sb-soon" aria-label="Phone — coming soon">
+          <rect x="184" y="258" width="128" height="94" fill="transparent" pointer-events="all"/>
+          <g class="lift">
+            <rect x="190" y="338" width="58" height="9" rx="2" fill="#fff4e8"/>
+            <rect x="192" y="328" width="56" height="9" rx="2" fill="#e8b07a"/>
+            <rect x="190" y="318" width="58" height="9" rx="2" fill="#ffd2a0"/>
+            <path d="M270 350 v-10 q0 -8 9 -8 h18 q9 0 9 8 v10 z" fill="#5d2a14"/>
+            <rect x="277" y="324" width="6" height="12" rx="2" fill="#6b3a1c"/>
+            <rect x="293" y="324" width="6" height="12" rx="2" fill="#6b3a1c"/>
+            <path d="M272 322 q16 -10 32 0" fill="none" stroke="#3a1c0c" stroke-width="8" stroke-linecap="round"/>
+            <circle cx="272" cy="322" r="5" fill="#3a1c0c"/>
+            <circle cx="304" cy="322" r="5" fill="#3a1c0c"/>
+            <circle cx="288" cy="343" r="6" fill="#ffd23d"/>
+            <circle cx="288" cy="343" r="2.5" fill="#9c5a30"/>
+          </g>
+          <rect class="ring" x="180" y="254" width="136" height="102" rx="8" fill="none" stroke="#fff" stroke-width="3"/>
+          <g transform="translate(248,231)"><g class="sb-tag"><rect class="sb-tag-bg" x="-55" y="-18" width="110" height="36" rx="12"/><polygon class="sb-tag-bg" points="-7,18 7,18 0,27"/><text x="0" y="6" text-anchor="middle"><tspan class="sb-tag-tx">Phone</tspan><tspan class="sb-tag-soon"> · soon</tspan></text></g></g>
+        </a>
+        <!-- COMPARTMENT 5 — bottom-left (books) → Blog -->
+        <a class="sb-sub sb-soon" aria-label="Blog — coming soon">
+          <rect x="58" y="368" width="80" height="88" fill="transparent" pointer-events="all"/>
+          <g class="lift">
+            <rect x="64" y="396" width="14" height="58" rx="2" fill="#ff3d8b"/>
+            <rect x="79" y="390" width="13" height="64" rx="2" fill="#ffd23d"/>
+            <rect x="93" y="398" width="13" height="56" rx="2" fill="#fff4e8"/>
+            <rect x="107" y="392" width="12" height="62" rx="2" fill="#1fc6c6"/>
+            <rect x="120" y="400" width="12" height="54" rx="2" fill="#c0764a"/>
+          </g>
+          <rect class="ring" x="54" y="364" width="88" height="96" rx="8" fill="none" stroke="#fff" stroke-width="3"/>
+          <g transform="translate(98,341)"><g class="sb-tag"><rect class="sb-tag-bg" x="-50" y="-18" width="100" height="36" rx="12"/><polygon class="sb-tag-bg" points="-7,18 7,18 0,27"/><text x="0" y="6" text-anchor="middle"><tspan class="sb-tag-tx">Blog</tspan><tspan class="sb-tag-soon"> · soon</tspan></text></g></g>
+        </a>
+        <!-- COMPARTMENT 6 — bottom-center (bottles + dome) -->
+        <a class="sb-sub sb-soon" aria-label="Bottles — coming soon">
+          <rect x="150" y="368" width="86" height="88" fill="transparent" pointer-events="all"/>
+          <g class="lift">
+            <path d="M160 454 v-30 q0 -6 4 -9 v-9 h6 v9 q4 3 4 9 v30 z" fill="#6fcf6f" opacity="0.9"/>
+            <rect x="159" y="436" width="14" height="9" rx="2" fill="#fff4e8"/>
+            <path d="M182 454 v-30 q0 -6 4 -9 v-9 h6 v9 q4 3 4 9 v30 z" fill="#0d8d8d" opacity="0.9"/>
+            <rect x="181" y="436" width="14" height="9" rx="2" fill="#fff4e8"/>
+            <path d="M206 454 v-26 a13 13 0 0 1 26 0 v26 z" fill="#5bb8e6" opacity="0.35"/>
+            <path d="M206 454 v-26 a13 13 0 0 1 26 0 v26 z" fill="none" stroke="#fff4e8" stroke-width="2" opacity="0.6"/>
+            <circle cx="219" cy="446" r="6" fill="#e8b07a"/>
+          </g>
+          <rect class="ring" x="146" y="364" width="94" height="96" rx="8" fill="none" stroke="#fff" stroke-width="3"/>
+          <g transform="translate(193,341)"><g class="sb-tag"><rect class="sb-tag-bg" x="-62" y="-18" width="124" height="36" rx="12"/><polygon class="sb-tag-bg" points="-7,18 7,18 0,27"/><text x="0" y="6" text-anchor="middle"><tspan class="sb-tag-tx">Bottles</tspan><tspan class="sb-tag-soon"> · soon</tspan></text></g></g>
+        </a>
+        <!-- COMPARTMENT 7 — bottom-right (books) -->
+        <a class="sb-sub sb-soon" aria-label="Reads — coming soon">
+          <rect x="248" y="368" width="64" height="88" fill="transparent" pointer-events="all"/>
+          <g class="lift">
+            <rect x="254" y="398" width="12" height="56" rx="2" fill="#6b3a1c"/>
+            <rect x="267" y="392" width="12" height="62" rx="2" fill="#c41e63"/>
+            <rect x="280" y="400" width="12" height="54" rx="2" fill="#ffd23d"/>
+            <rect x="293" y="394" width="12" height="60" rx="2" fill="#fff4e8"/>
+          </g>
+          <rect class="ring" x="244" y="364" width="72" height="96" rx="8" fill="none" stroke="#fff" stroke-width="3"/>
+          <g transform="translate(280,341)"><g class="sb-tag"><rect class="sb-tag-bg" x="-53" y="-18" width="106" height="36" rx="12"/><polygon class="sb-tag-bg" points="-7,18 7,18 0,27"/><text x="0" y="6" text-anchor="middle"><tspan class="sb-tag-tx">Reads</tspan><tspan class="sb-tag-soon"> · soon</tspan></text></g></g>
+        </a>
+      </g>
+
+      <!-- ================= DESK (right) — container drags; parts hover/click/label individually ================= -->
+      <g class="sb-item-pos" data-item="desk" transform="translate(920,315)">
+        <defs>
+          <linearGradient id="deskScreenGrad" x1="0" y1="0" x2="0.4" y2="1">
+            <stop offset="0" stop-color="#ff4d2e"/><stop offset="0.4" stop-color="#ff7a3d"/>
+            <stop offset="0.7" stop-color="#ffa969"/><stop offset="1" stop-color="#1fc6c6"/>
+          </linearGradient>
+        </defs>
+        <ellipse class="propshadow" cx="240" cy="352" rx="200" ry="30" fill="#7a3413" opacity="0.24"/>
+        <!-- DESK BODY (the wood; clickable + label; furniture stays put, no bounce) -->
+        <a class="sb-sub sb-soon" id="navDesk" href="#" aria-label="Desk — coming soon">
+          <rect x="36" y="92" width="392" height="276" fill="transparent" pointer-events="all"/>
+          <path d="M60,150 L300,108 L420,170 L180,212 Z" fill="#e8b07a"/>
+          <path d="M60,150 L180,212 L180,236 L60,174 Z" fill="#9c5a30"/>
+          <path d="M180,212 L420,170 L420,194 L180,236 Z" fill="#c0764a"/>
+          <path d="M300,108 L420,170 L300,194 L240,130 Z" fill="#efbc89" opacity="0.55"/>
+          <rect x="92" y="200" width="22" height="138" rx="11" fill="#5d2a14"/>
+          <rect x="92" y="200" width="9" height="138" rx="4.5" fill="#6b3a1c"/>
+          <ellipse cx="103" cy="338" rx="13" ry="6" fill="#4a2110"/>
+          <path d="M300,206 L378,192 L378,330 L300,344 Z" fill="#d98a4e"/>
+          <path d="M378,192 L412,210 L412,330 L378,330 Z" fill="#9c5a30"/>
+          <path d="M300,206 L378,192 L412,210 L334,224 Z" fill="#c0764a"/>
+          <path d="M308,222 L370,211 L370,258 L308,269 Z" fill="#6b3a1c"/>
+          <path d="M316,238 L324,236.5 L324,266 L316,267.5 Z" fill="#ff3d8b"/>
+          <path d="M325,236.3 L333,235 L333,264.5 L325,266 Z" fill="#5bb8e6"/>
+          <path d="M334,234.8 L344,233 L344,263 L334,264.5 Z" fill="#ffd23d"/>
+          <path d="M345,233 L356,231 L356,261.5 L345,263 Z" fill="#6fcf6f"/>
+          <path d="M306,278 L372,267 L372,300 L306,311 Z" fill="#e8b07a"/>
+          <path d="M306,313 L372,302 L372,335 L306,346 Z" fill="#cf8048"/>
+          <rect x="330" y="290" width="20" height="5" rx="2.5" fill="#5d2a14" transform="rotate(-9 340 292)"/>
+          <rect x="330" y="324" width="20" height="5" rx="2.5" fill="#5d2a14" transform="rotate(-9 340 326)"/>
+          <ellipse cx="356" cy="338" rx="22" ry="7" fill="#4a2110" opacity="0.5"/>
+          <rect class="ring" x="48" y="88" width="380" height="288" rx="18" fill="none" stroke="#fff" stroke-width="3"/>
+          <g transform="translate(150,86)"><g class="sb-tag">
+            <rect class="sb-tag-bg" x="-58" y="-18" width="116" height="36" rx="12"/>
+            <polygon class="sb-tag-bg" points="-7,18 7,18 0,27"/>
+            <text x="0" y="6" text-anchor="middle"><tspan class="sb-tag-tx">Desk</tspan><tspan class="sb-tag-soon"> · soon</tspan></text>
+          </g></g>
+        </a>
+        <!-- LAPTOP → Wallpaper (LIVE) -->
+        <a class="sb-sub" id="navWallpaper" href="./wallpaper/" aria-label="Open Wallpaper — three astronomy interactions">
+          <rect x="200" y="90" width="122" height="102" fill="transparent" pointer-events="all"/>
+          <g class="lift">
+            <path d="M210,162 L270,152 L314,174 L254,184 Z" fill="#cfd6da"/>
+            <path d="M210,162 L254,184 L254,190 L210,168 Z" fill="#9aa3a8"/>
+            <path d="M254,184 L314,174 L314,180 L254,190 Z" fill="#b5bcc0"/>
+            <path d="M222,165 L267,157 L300,174 L255,182 Z" fill="#8f989e"/>
+            <path d="M250,178 L268,175 L276,179 L258,182 Z" fill="#7e878c"/>
+            <path d="M214,160 L268,151 L292,96 L238,105 Z" fill="#c8cfd3"/>
+            <path d="M268,151 L292,96 L296,99 L272,154 Z" fill="#9aa3a8"/>
+            <path d="M221,156 L264,148.5 L284,102 L241,110 Z" fill="url(#deskScreenGrad)"/>
+            <path d="M252,150 L264,148.5 L284,102 L268,105 Z" fill="#fff1cf" opacity="0.28"/>
+            <path d="M221,156 L264,148.5 L284,102 L241,110 Z" fill="none" stroke="#dfe5e8" stroke-width="1.6"/>
+          </g>
+          <g transform="translate(255,86)"><g class="sb-tag">
+            <rect class="sb-tag-bg" x="-78" y="-18" width="156" height="36" rx="12"/>
+            <polygon class="sb-tag-bg" points="-7,18 7,18 0,27"/>
+            <text class="sb-tag-tx" x="-8" y="6" text-anchor="middle">Wallpaper</text>
+            <text class="sb-tag-arrow" x="56" y="6" text-anchor="middle">↗</text>
+          </g></g>
+        </a>
+        <!-- PLANT → soon -->
+        <a class="sb-sub sb-soon" aria-label="Plant — coming soon">
+          <rect x="78" y="98" width="48" height="58" fill="transparent" pointer-events="all"/>
+          <g class="lift">
+            <path d="M86,128 L108,124 L104,148 L92,150 Z" fill="#fff4e8"/>
+            <path d="M108,124 L114,127 L110,150 L104,148 Z" fill="#ffe1a6"/>
+            <ellipse cx="92" cy="112" rx="9" ry="15" fill="#6fcf6f" transform="rotate(-22 92 112)"/>
+            <ellipse cx="104" cy="106" rx="9" ry="17" fill="#6fcf6f" transform="rotate(8 104 106)"/>
+            <ellipse cx="113" cy="114" rx="8" ry="13" fill="#5bbf5b" transform="rotate(30 113 114)"/>
+          </g>
+          <g transform="translate(100,96)"><g class="sb-tag">
+            <rect class="sb-tag-bg" x="-52" y="-18" width="104" height="36" rx="12"/>
+            <polygon class="sb-tag-bg" points="-7,18 7,18 0,27"/>
+            <text x="0" y="6" text-anchor="middle"><tspan class="sb-tag-tx">Plant</tspan><tspan class="sb-tag-soon"> · soon</tspan></text>
+          </g></g>
+        </a>
+        <!-- MUG → soon -->
+        <a class="sb-sub sb-soon" aria-label="Coffee — coming soon">
+          <rect x="138" y="182" width="44" height="36" fill="transparent" pointer-events="all"/>
+          <g class="lift">
+            <ellipse cx="158" cy="196" rx="16" ry="7" fill="#c41e63"/>
+            <path d="M142,194 L174,194 L171,210 a14 6 0 0 1 -26 0 Z" fill="#ff3d8b"/>
+            <ellipse cx="158" cy="194" rx="15" ry="6" fill="#fff4e8"/>
+            <ellipse cx="158" cy="194" rx="9" ry="3.6" fill="#9c5a30"/>
+            <path d="M172,196 a9 8 0 0 1 0 13" fill="none" stroke="#c41e63" stroke-width="4" stroke-linecap="round"/>
+          </g>
+          <g transform="translate(158,172)"><g class="sb-tag">
+            <rect class="sb-tag-bg" x="-56" y="-18" width="112" height="36" rx="12"/>
+            <polygon class="sb-tag-bg" points="-7,18 7,18 0,27"/>
+            <text x="0" y="6" text-anchor="middle"><tspan class="sb-tag-tx">Coffee</tspan><tspan class="sb-tag-soon"> · soon</tspan></text>
+          </g></g>
+        </a>
+      </g>
+
+      <!-- ================= SANDBOX (center) ================= -->
+      <g id="sandboxArt" transform="translate(380,300)">
+        <!-- sandbox frame + sand (workflow); toys extracted to #sb-items below -->
+        <defs>
+          <linearGradient id="sandboxSandTop" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ffe1a6"/><stop offset="0.55" stop-color="#f6c476"/><stop offset="1" stop-color="#e2a458"/>
+          </linearGradient>
+          <linearGradient id="sandboxRailLight" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#e8b07a"/><stop offset="1" stop-color="#d98a4e"/>
+          </linearGradient>
+          <radialGradient id="sandboxBall" cx="0.35" cy="0.3" r="0.8">
+            <stop offset="0" stop-color="#fff4e8"/><stop offset="1" stop-color="#ffd2a0"/>
+          </radialGradient>
+        </defs>
+        <ellipse cx="310" cy="350" rx="300" ry="46" fill="#7a3413" opacity="0.22"/>
+        <path d="M25,180 L25,232 L310,372 L310,320 Z" fill="#9c5a30"/>
+        <path d="M310,320 L310,372 L595,232 L595,180 Z" fill="#7a3413"/>
+        <path d="M25,180 L310,320 L310,288 L71,164 Z" fill="url(#sandboxRailLight)"/>
+        <path d="M310,320 L595,180 L549,164 L310,288 Z" fill="#e8b07a"/>
+        <path d="M310,40 L25,180 L71,164 L310,72 Z" fill="#c0764a"/>
+        <path d="M310,40 L595,180 L549,164 L310,72 Z" fill="#d98a4e"/>
+        <path d="M25,180 L310,320 L310,312 L40,178 Z" fill="#e8b07a" opacity="0.7"/>
+        <path d="M310,320 L595,180 L580,178 L310,312 Z" fill="#fff4e8" opacity="0.4"/>
+        <path d="M71,164 L310,288 L310,280 L80,158 Z" fill="#9c5a30"/>
+        <path d="M310,288 L549,164 L540,158 L310,280 Z" fill="#c0764a"/>
+        <path d="M310,72 L71,164 L80,158 L310,80 Z" fill="#6b3a1c"/>
+        <path d="M310,72 L549,164 L540,158 L310,80 Z" fill="#9c5a30"/>
+        <path d="M310,80 L540,158 L310,280 L80,158 Z" fill="url(#sandboxSandTop)"/>
+        <path d="M150,170 Q230,110 310,108 Q420,110 470,168 Q400,150 310,150 Q210,150 150,170 Z" fill="#ffe1a6" opacity="0.75"/>
+        <path d="M80,158 L310,280 L240,250 Q150,200 100,168 Z" fill="#c5853f" opacity="0.55"/>
+        <path d="M310,280 L540,158 L470,200 Q400,250 360,262 Z" fill="#e2a458" opacity="0.5"/>
+        <path d="M170,178 Q240,158 310,160" stroke="#e2a458" stroke-width="3" fill="none" opacity="0.5" stroke-linecap="round"/>
+        <path d="M210,210 Q290,188 370,196" stroke="#c5853f" stroke-width="3" fill="none" opacity="0.45" stroke-linecap="round"/>
+        <path d="M260,238 Q330,220 400,224" stroke="#e2a458" stroke-width="2.5" fill="none" opacity="0.4" stroke-linecap="round"/>
+        <path d="M25,232 Q22,246 30,248 L310,388 Q316,388 310,372 Z" fill="#9c5a30"/>
+        <path d="M310,372 L310,388 Q316,388 320,386 L595,248 Q600,244 595,232 Z" fill="#6b3a1c"/>
+      </g>
+
+      <!-- sand drag trail (divots) live here: on the sand, behind avatar & toys -->
+      <g id="sb-trails"></g>
+
+      <!-- ================= AVATAR (seated in the sandbox) ================= -->
+      <!-- NAVY BALL CAP (side profile, iconic shape) → soon (draggable + clickable + label) -->
+      <g class="sb-item-pos" data-item="cap" data-sand="1" transform="translate(690,478)">
+        <a class="sb-item sb-soon" href="#" aria-label="Cap — coming soon">
+          <rect x="-84" y="-134" width="180" height="140" fill="transparent" pointer-events="all"/>
+          <g transform="translate(-120,-161)">
+            <ellipse class="propshadow" cx="120" cy="161" rx="88" ry="15" fill="#7a3413" opacity="0.24"/>
+            <g class="drop" style="--i:3"><g class="bob" style="--i:3"><g class="lift">
+              <path d="M48 128 C 40 86, 58 44, 100 38 C 144 32, 174 60, 176 102 C 177 118, 172 128, 162 132 C 142 138, 110 139, 88 137 C 70 135, 54 134, 48 128 Z" style="fill:var(--av-pants)"/>
+              <path d="M48 128 C 42 104, 46 78, 62 58 C 54 84, 56 110, 70 132 C 62 134, 52 132, 48 128 Z" fill="#1b2942"/>
+              <path d="M96 130 C 128 130, 168 136, 202 152 C 211 156, 211 160, 202 160 C 176 161, 144 156, 116 147 C 102 142, 92 136, 96 130 Z" fill="#16223a"/>
+              <path d="M96 124 C 130 121, 172 128, 203 148 C 210 152, 209 156, 200 153 C 170 142, 134 138, 108 140 C 96 141, 90 130, 96 124 Z" style="fill:var(--av-pants)"/>
+              <path d="M118 124 C 150 123, 180 131, 199 146 C 202 148, 201 150, 197 148 C 176 137, 148 132, 122 133 C 116 133, 113 124, 118 124 Z" fill="#3f547e" opacity="0.85"/>
+              <path d="M116 41 C 146 41, 168 64, 173 96 C 164 72, 144 54, 116 51 C 111 50, 111 42, 116 41 Z" fill="#3f547e" opacity="0.7"/>
+              <path d="M128 46 C 148 50, 162 68, 166 90 C 160 74, 148 60, 130 54 C 126 52, 125 47, 128 46 Z" fill="#56688f" opacity="0.3"/>
+              <path d="M100 40 C 90 76, 90 108, 94 135" fill="none" stroke="#54678c" stroke-width="2.4" stroke-linecap="round" opacity="0.5"/>
+              <path d="M142 46 C 148 78, 144 110, 130 134" fill="none" stroke="#54678c" stroke-width="2.2" stroke-linecap="round" opacity="0.4"/>
+              <path d="M52 130 C 84 139, 130 140, 162 132" fill="none" stroke="#16223a" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+              <path d="M46 110 C 38 110, 36 121, 44 123 C 51 125, 53 116, 49 110 Z" style="fill:var(--av-pants)"/>
+              <path d="M46 110 C 40 111, 38 118, 43 122 C 41 117, 42 112, 46 110 Z" fill="#1b2942"/>
+              <circle cx="98" cy="37" r="6" style="fill:var(--av-pants)"/>
+              <circle cx="100" cy="35" r="3" fill="#3f547e" opacity="0.9"/>
+            </g></g></g>
+          </g>
+          <g transform="translate(0,-138)"><g class="sb-tag">
+            <rect class="sb-tag-bg" x="-58" y="-18" width="116" height="36" rx="12"/>
+            <polygon class="sb-tag-bg" points="-7,18 7,18 0,27"/>
+            <text x="0" y="6" text-anchor="middle"><tspan class="sb-tag-tx">Cap</tspan><tspan class="sb-tag-soon"> · soon</tspan></text>
+          </g></g>
+        </a>
+      </g>
+
+      <!-- ================= TOYS (draggable; ball = Rainbow nav) ================= -->
+      <g id="sb-items">
+        <!-- BUCKET (play only) -->
+        <g class="sb-item-pos" data-toy="bucket" data-sand="1" transform="translate(545,540)">
+          <a class="sb-item sb-soon" href="#" aria-label="Build — coming soon">
+            <rect x="-48" y="-110" width="96" height="124" fill="transparent" pointer-events="all"/>
+            <g transform="translate(-40,-92)">
+              <ellipse class="propshadow" cx="40" cy="92" rx="36" ry="9" fill="#7a3413" opacity="0.24"/>
+              <g class="drop" style="--i:0"><g class="bob" style="--i:0"><g class="lift">
+                <path d="M12,30 Q40,2 68,30" stroke="#c41e63" stroke-width="6" fill="none" stroke-linecap="round"/>
+                <path d="M10,28 L70,28 L60,86 Q40,94 20,86 Z" fill="#ff3d8b"/>
+                <path d="M40,28 L70,28 L60,86 Q50,90 40,90 Z" fill="#c41e63"/>
+                <ellipse cx="40" cy="28" rx="30" ry="8" fill="#ff5fa0"/>
+                <ellipse cx="40" cy="27" rx="24" ry="5.5" fill="#c41e63"/>
+                <path d="M18,34 Q22,60 28,82" stroke="#fff4e8" stroke-width="3.5" fill="none" opacity="0.55" stroke-linecap="round"/>
+              </g></g></g>
+            </g>
+            <g transform="translate(0,-112)"><g class="sb-tag">
+              <rect class="sb-tag-bg" x="-66" y="-18" width="132" height="36" rx="12"/>
+              <polygon class="sb-tag-bg" points="-7,18 7,18 0,27"/>
+              <text x="0" y="6" text-anchor="middle"><tspan class="sb-tag-tx">Build</tspan><tspan class="sb-tag-soon"> · soon</tspan></text>
+            </g></g>
+          </a>
+        </g>
+        <!-- SHOVEL (play only) -->
+        <g class="sb-item-pos" data-toy="shovel" data-sand="1" transform="translate(835,545)">
+          <a class="sb-item sb-soon" href="#" aria-label="Dig — coming soon">
+            <rect x="-44" y="-128" width="88" height="142" fill="transparent" pointer-events="all"/>
+            <g transform="translate(-35,-108)">
+              <ellipse class="propshadow" cx="35" cy="108" rx="30" ry="8" fill="#7a3413" opacity="0.24"/>
+              <g class="drop" style="--i:2"><g class="bob" style="--i:2"><g class="lift">
+                <rect x="29" y="14" width="12" height="62" rx="6" fill="#1fc6c6"/>
+                <rect x="35" y="14" width="6" height="62" rx="3" fill="#0d8d8d"/>
+                <path d="M18,6 Q35,-6 52,6 L52,18 Q35,8 18,18 Z" fill="#1fc6c6"/>
+                <ellipse cx="35" cy="12" rx="12" ry="7" fill="none" stroke="#0d8d8d" stroke-width="4"/>
+                <path d="M16,74 L54,74 Q56,96 35,108 Q14,96 16,74 Z" fill="#1fc6c6"/>
+                <path d="M35,74 L54,74 Q56,96 35,108 Z" fill="#0d8d8d"/>
+                <path d="M22,80 Q24,94 32,102" stroke="#7fe8e8" stroke-width="3" fill="none" opacity="0.6" stroke-linecap="round"/>
+              </g></g></g>
+            </g>
+            <g transform="translate(0,-138)"><g class="sb-tag">
+              <rect class="sb-tag-bg" x="-58" y="-18" width="116" height="36" rx="12"/>
+              <polygon class="sb-tag-bg" points="-7,18 7,18 0,27"/>
+              <text x="0" y="6" text-anchor="middle"><tspan class="sb-tag-tx">Dig</tspan><tspan class="sb-tag-soon"> · soon</tspan></text>
+            </g></g>
+          </a>
+        </g>
+        <!-- BEACH BALL → Rainbow (soon) -->
+        <g class="sb-item-pos" data-toy="ball" data-sand="1" transform="translate(690,568)">
+          <a class="sb-item sb-soon" id="navRainbow" href="#" aria-label="Rainbow Magnet — coming soon">
+            <rect x="-46" y="-80" width="92" height="94" fill="transparent" pointer-events="all"/>
+            <g transform="translate(-35,-70)">
+              <ellipse class="propshadow" cx="35" cy="70" rx="30" ry="8" fill="#7a3413" opacity="0.24"/>
+              <g class="drop" style="--i:1"><g class="bob" style="--i:1"><g class="lift">
+                <circle cx="35" cy="35" r="34" fill="url(#sandboxBall)"/>
+                <path d="M35,1 A34,34 0 0,1 60,12 L35,35 Z" fill="#ff3d8b"/>
+                <path d="M60,12 A34,34 0 0,1 69,35 L35,35 Z" fill="#ffd23d"/>
+                <path d="M69,35 A34,34 0 0,1 56,61 L35,35 Z" fill="#1fc6c6"/>
+                <path d="M56,61 A34,34 0 0,1 22,67 L35,35 Z" fill="#ff4d2e"/>
+                <path d="M22,67 A34,34 0 0,1 4,28 L35,35 Z" fill="#fff4e8"/>
+                <path d="M4,28 A34,34 0 0,1 35,1 L35,35 Z" fill="#5bb8e6"/>
+                <circle cx="35" cy="35" r="34" fill="none" stroke="#c41e63" stroke-width="1.5" opacity="0.3"/>
+                <ellipse cx="24" cy="20" rx="8" ry="5" fill="#fff" opacity="0.7" transform="rotate(-30 24 20)"/>
+              </g></g></g>
+            </g>
+            <g transform="translate(0,-92)"><g class="sb-tag">
+              <rect class="sb-tag-bg" x="-78" y="-18" width="156" height="36" rx="12"/>
+              <polygon class="sb-tag-bg" points="-7,18 7,18 0,27"/>
+              <text x="0" y="6" text-anchor="middle"><tspan class="sb-tag-tx">Rainbow</tspan><tspan class="sb-tag-soon"> · soon</tspan></text>
+            </g></g>
+          </a>
+        </g>
+      </g>
+    </svg>
+    </div>
+
+    <h1 class="sb-wordmark">Sandbox</h1>
+    <p class="sb-tagline">
+      A sunset playground of web experiments. Drag anything around — click a corner to explore.
+      <span class="ko">웹 실험들의 모래밭 — 뭐든 끌어보고, 눌러서 들어가 보세요.</span>
+    </p>
+  </div>
+</div>
+
+<script>
+(function(){
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var fine   = window.matchMedia && window.matchMedia('(pointer:fine)').matches;
+  var stage  = document.getElementById('sbStage');
+  var svg    = document.getElementById('sbDiorama');
+  var trails = document.getElementById('sb-trails');
+
+  /* ---- floating motes ---- */
+  var motes = document.getElementById('sbMotes');
+  if(motes && !reduce){
+    for(var i=0;i<7;i++){
+      var m=document.createElement('div'); m.className='sb-mote';
+      m.style.left=(8+i*13)+'%'; m.style.top=(40+(i%4)*14)+'%';
+      m.style.animationDelay=(i*1.9)+'s'; m.style.animationDuration=(11+i*1.3)+'s';
+      motes.appendChild(m);
+    }
+  }
+  /* ---- night stars ---- */
+  var starBox=document.getElementById('sbStars');
+  if(starBox){
+    for(var s=0;s<26;s++){
+      var st=document.createElement('div'); st.className='sb-star';
+      st.style.left=(Math.round((s*37+13)%100))+'%';
+      st.style.top=(Math.round((s*53+7)%62))+'%';
+      st.style.animationDelay=((s%9)*0.4)+'s';
+      st.style.opacity=(0.5+((s%5)*0.1));
+      starBox.appendChild(st);
+    }
+  }
+
+  /* ---- day / night toggle ---- */
+  var toggle=document.getElementById('sbToggle');
+  var saved=null; try{ saved=localStorage.getItem('sb-theme'); }catch(e){}
+  if(saved==='night'){ stage.classList.add('night'); toggle.textContent='🌙'; }
+  toggle.addEventListener('click', function(){
+    var night=stage.classList.toggle('night');
+    toggle.textContent=night?'🌙':'☀️';
+    try{ localStorage.setItem('sb-theme', night?'night':'day'); }catch(e){}
+  });
+
+  /* ---- diorama parallax (fine pointer only) ---- */
+  if(stage && !reduce && fine){
+    var raf=null, tx=0, ty=0;
+    stage.addEventListener('pointermove', function(e){
+      if(window.__sbDragging) return;            /* don't fight a toy drag */
+      var r=stage.getBoundingClientRect();
+      tx=(e.clientX-r.left)/r.width-0.5; ty=(e.clientY-r.top)/r.height-0.5;
+      if(!raf) raf=requestAnimationFrame(applyP);
+    });
+    stage.addEventListener('pointerleave', function(){ tx=0; ty=0; if(!raf) raf=requestAnimationFrame(applyP); });
+    function applyP(){
+      raf=null;
+      svg.style.transform='rotateX('+(ty*-4).toFixed(2)+'deg) rotateY('+(tx*6).toFixed(2)+'deg) translate('+(tx*-14).toFixed(1)+'px,'+(ty*-9).toFixed(1)+'px)';
+    }
+  }
+
+  /* ---- client coords -> svg user units (accounts for parallax/scale) ---- */
+  function toSvg(clientX, clientY){
+    var pt=svg.createSVGPoint(); pt.x=clientX; pt.y=clientY;
+    var ctm=svg.getScreenCTM(); if(!ctm) return null;
+    var p=pt.matrixTransform(ctm.inverse());
+    return {x:p.x, y:p.y};
+  }
+
+  /* ---- sand divot (drag trail) ---- */
+  var POOL=[], POOL_MAX=64;
+  function stampDivot(x,y){
+    var ns='http://www.w3.org/2000/svg';
+    var g=document.createElementNS(ns,'g'); g.setAttribute('class','sb-divot');
+    g.setAttribute('transform','translate('+x.toFixed(1)+','+y.toFixed(1)+')');
+    var hollow=document.createElementNS(ns,'ellipse');
+    hollow.setAttribute('rx',(8+Math.random()*4).toFixed(1)); hollow.setAttribute('ry',(4+Math.random()*2).toFixed(1));
+    hollow.setAttribute('fill','#c5853f'); hollow.setAttribute('opacity','.55');
+    var rim=document.createElementNS(ns,'ellipse');
+    rim.setAttribute('rx','11'); rim.setAttribute('ry','5.5'); rim.setAttribute('cy','-1.5');
+    rim.setAttribute('fill','none'); rim.setAttribute('stroke','#fff0c8'); rim.setAttribute('stroke-width','2'); rim.setAttribute('opacity','.5');
+    g.appendChild(rim); g.appendChild(hollow);
+    trails.appendChild(g);
+    POOL.push(g);
+    g.addEventListener('animationend', function(){ g.remove(); var k=POOL.indexOf(g); if(k>=0) POOL.splice(k,1); });
+    while(POOL.length>POOL_MAX){ var old=POOL.shift(); if(old) old.remove(); }
+  }
+
+  /* ---- drag engine for toys ---- */
+  /* clamp toys to roughly the sand area (scene user units) */
+  var SAND={x0:460,x1:920,y0:380,y1:585};   /* drag-trails only stamp inside the sand */
+  var BOUND={x0:-30,x1:1300,y0:180,y1:700}; /* nothing leaves the frame */
+  var DX=300, DY=185;                        /* how far an item may roam from its home spot */
+  var DRAG_THRESH=5;
+  /* DRAG = whole container (.sb-item-pos). HOVER/CLICK/LABEL = per leaf part
+     (.sb-item for simple toys, .sb-sub for parts inside a container like desk/bookshelf). */
+  document.querySelectorAll('.sb-item-pos').forEach(function(pos){
+    var startTx=0, startTy=0, startP=null, dragging=false, pid=null, last=null, rafD=null, pending=null, pressed=null;
+    function curT(){ var m=/translate\(([-\d.]+),\s*([-\d.]+)\)/.exec(pos.getAttribute('transform')||''); return m?{x:+m[1],y:+m[2]}:{x:0,y:0}; }
+    var home=curT();                           /* original spot — roam clamp is relative to it */
+    var isSand=pos.dataset.sand==='1';
+    function applyD(){
+      rafD=null; if(!pending) return;
+      var nx=Math.max(Math.max(BOUND.x0,home.x-DX), Math.min(Math.min(BOUND.x1,home.x+DX), pending.x));
+      var ny=Math.max(Math.max(BOUND.y0,home.y-DY), Math.min(Math.min(BOUND.y1,home.y+DY), pending.y));
+      pos.setAttribute('transform','translate('+nx.toFixed(1)+','+ny.toFixed(1)+')');
+      if(dragging && !reduce && isSand && nx>SAND.x0 && nx<SAND.x1 && ny>SAND.y0 && ny<SAND.y1){
+        if(!last || Math.hypot(nx-last.x,ny-last.y)>14){ stampDivot(nx, ny+2); last={x:nx,y:ny}; }
+      }
+    }
+    pos.addEventListener('pointerdown', function(e){
+      pressed = e.target.closest && e.target.closest('.sb-sub, .sb-item');  /* which leaf part was grabbed */
+      pid=e.pointerId; var c=curT(); startTx=c.x; startTy=c.y;
+      startP=toSvg(e.clientX,e.clientY); dragging=false; last=null;
+      try{ pos.setPointerCapture(pid); }catch(_){}
+    });
+    pos.addEventListener('pointermove', function(e){
+      if(pid===null || !startP) return;
+      var p=toSvg(e.clientX,e.clientY); if(!p) return;
+      var dx=p.x-startP.x, dy=p.y-startP.y;
+      if(!dragging && Math.hypot(dx,dy)>DRAG_THRESH){ dragging=true; window.__sbDragging=true; if(pressed) pressed.classList.add('dragging'); }
+      if(dragging){ pending={x:startTx+dx, y:startTy+dy}; if(!rafD) rafD=requestAnimationFrame(applyD); }
+    });
+    function end(){
+      if(pid===null) return;
+      try{ pos.releasePointerCapture(pid); }catch(_){}
+      pid=null; startP=null;
+      if(dragging){ if(pressed) pressed.classList.remove('dragging'); window.__sbDragging=false; }
+    }
+    pos.addEventListener('pointerup', function(e){
+      var wasDrag=dragging; end();
+      if(!wasDrag && pressed){ navLeaf(pressed, e, false); }   /* a click on a leaf, not a drag */
+      else if(wasDrag){ e.preventDefault(); }
+    });
+    pos.addEventListener('pointercancel', end);
+  });
+
+  /* keyboard activation on each leaf part (anchors are tab-focusable) */
+  document.querySelectorAll('.sb-sub, .sb-item').forEach(function(leaf){
+    leaf.addEventListener('click', function(e){
+      if(e.detail===0){ navLeaf(leaf, e, true); }   /* Enter/Space — no pointerup fired */
+      else { e.preventDefault(); }                   /* pointer click already handled in pointerup */
+    });
+  });
+
+  /* nav a leaf: soon → shake its label; live → go to href */
+  function navLeaf(leaf, e, kb){
+    if(leaf.classList.contains('sb-soon')){ if(e && e.preventDefault) e.preventDefault(); shake(leaf); return; }
+    var h=leaf.getAttribute('href');
+    if(kb){ if((!h || h==='#') && e) e.preventDefault(); /* else let native <a> navigate */ }
+    else { if(h && h!=='#'){ window.location.href=h; } else if(e) e.preventDefault(); }
+  }
+  /* ---- soon-reject feedback (pops the part's signpost up + jiggles it) ---- */
+  function shake(el){ var t=el.querySelector('.sb-tag'); if(!t) return; t.classList.remove('sb-shake'); requestAnimationFrame(function(){ requestAnimationFrame(function(){ t.classList.add('sb-shake'); }); }); }
+})();
+</script>
