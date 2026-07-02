@@ -33,7 +33,11 @@ jobs:
           mkdir -p _site
           cp home/index.html _site/index.html
           cp -r wallpaper/dist _site/wallpaper
-          # (blog -> _site/blog and rainbow -> _site/rainbow added later, #29/#30)
+          # shell pages, one per diorama item (#39) — a real build for a section
+          # (e.g. blog #29, rainbow #30) replaces its shell by copying over it later
+          for d in sections/*/; do
+            cp -r "$d" "_site/$(basename "$d")"
+          done
 
       - uses: actions/configure-pages@v5
         with:
