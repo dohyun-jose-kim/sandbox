@@ -1,70 +1,341 @@
-<!doctype html>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Plant · sandbox — dohyun-jose-kim</title>
-<meta name="description" content="Plant — a sandbox section under construction.">
+<meta name="description" content="moss — proximity growth. Interactive moss that grows toward your cursor (Three.js instancing + surface sampling).">
 <style>
-  :root{
-    --sky-0:#ff4d2e; --sky-1:#ff7a3d; --sky-2:#ffa969; --sky-3:#ffd2a0;
-    --sun:#fff1cf;
-    --sand-top:#ffe1a6; --sand-2:#f6c476; --sand-3:#e2a458; --sand-sh:#c5853f;
-    --pink:#ff3d8b; --cream:#fff4e8; --ink:#5d2a14; --muted:#b06a2e;
-    --font:"SF Pro Rounded", ui-rounded, "Quicksand", "Hiragino Maru Gothic Pro", system-ui, -apple-system, sans-serif;
+  /* ── 다크 미니멀 — 블로그 톤과 동일 ───────────────────────── */
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%;
+    background: #0d0d10;
+    color: #c9c9cf;
+    font-family: -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif;
+    overflow: hidden;
   }
-  .night{
-    --sky-0:#10162e; --sky-1:#1d2547; --sky-2:#2c3460; --sky-3:#46406e;
-    --sun:#cdd6ff;
+  canvas { display: block; }
+  #ui {
+    position: fixed;
+    top: 28px; left: 32px;
+    pointer-events: none;
+    user-select: none;
   }
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%}
-  body{
-    font-family:var(--font);
-    background:linear-gradient(180deg,var(--sky-0) 0%,var(--sky-1) 34%,var(--sky-2) 62%,var(--sky-3) 100%);
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    min-height:100vh; overflow:hidden; text-align:center; color:var(--cream);
-    transition:background .5s;
+  #ui h1 {
+    margin: 0 0 6px;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: #e8e8ec;
   }
-  .glow{
-    position:fixed; left:50%; top:26%; width:min(60vmin,420px); height:min(60vmin,420px);
-    transform:translate(-50%,-50%); border-radius:50%;
-    background:radial-gradient(circle, var(--sun) 0%, transparent 62%);
-    opacity:.85; pointer-events:none;
+  #ui p {
+    margin: 0;
+    font-size: 12px;
+    color: #6f6f78;
+    letter-spacing: 0.02em;
   }
-  main{position:relative; padding:24px}
-  .emoji{font-size:clamp(64px,16vmin,120px); line-height:1; display:block; animation:bob 3.2s ease-in-out infinite}
-  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-  h1{
-    margin:18px 0 8px; font-size:clamp(38px,9vmin,72px); font-weight:800; letter-spacing:.06em;
-    text-transform:uppercase; text-shadow:0 3px 0 rgba(93,42,20,.25);
-  }
-  .msg{margin:0; font-size:clamp(14px,2.6vmin,18px); font-weight:700; opacity:.95}
-  .msg small{display:block; margin-top:6px; font-weight:600; opacity:.85}
-  .back{
-    display:inline-block; margin-top:34px; padding:12px 22px; border-radius:999px;
-    background:var(--cream); color:var(--ink); font-weight:800; font-size:15px;
-    text-decoration:none; box-shadow:0 4px 0 rgba(93,42,20,.28);
-    transition:transform .15s;
-  }
-  .back:hover{transform:translateY(-2px)}
-  .sand{
-    position:fixed; left:50%; bottom:-14vmin; width:150vmax; height:26vmin; min-height:150px;
-    transform:translateX(-50%); border-radius:50% 50% 0 0 / 100% 100% 0 0;
-    background:linear-gradient(180deg,var(--sand-top),var(--sand-2) 55%,var(--sand-3));
-    box-shadow:inset 0 10px 24px rgba(197,133,63,.35);
-  }
-  @media (prefers-reduced-motion: reduce){ .emoji{animation:none} }
 </style>
-<div class="glow"></div>
-<div class="sand"></div>
-<main>
-  <span class="emoji" aria-hidden="true">🌱</span>
-  <h1>Plant</h1>
-  <p class="msg">under construction — still building this sandcastle
-    <small>아직 모래성을 쌓는 중이에요</small>
-  </p>
-  <a class="back" href="../">← back to the sandbox</a>
-</main>
-<script>
-  // follow the landing's day/night choice (same localStorage key)
-  try{ if(localStorage.getItem('sb-theme')==='night') document.documentElement.classList.add('night'); }catch(e){}
+</head>
+<body>
+
+<div id="ui">
+  <h1>moss — proximity growth</h1>
+  <p>커서를 바위 위에 올려보세요</p>
+</div>
+
+<a class="back" href="../"
+   style="position:fixed; top:22px; right:26px; color:#d8d4c8; text-decoration:none;
+          font-size:11.5px; letter-spacing:0.06em; opacity:0.45; transition:opacity .25s; z-index:10;"
+   onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.45">← back to the sandbox</a>
+
+<!-- Three.js CDN importmap (r160) -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
 </script>
+
+<script type="module">
+/*
+ * moss — proximity growth
+ * ─────────────────────────────────────────────────────────────
+ * @Amin_Ankward의 "moss interactive" 컨셉(원본: Blender geometry nodes)의
+ * 웹 재현. 기법은 Codrops "Building an Interactive Image Grid with
+ * Three.js"(Samuel Jarry)에서 정리된 정석 패턴:
+ *
+ *   1. MeshSurfaceSampler 로 베이스 표면(바위) 위에 밀도 기반 산포
+ *   2. 커서 raycast 교차점 ↔ 각 인스턴스 거리 d → smoothstep 감쇠(0~1 영향도)
+ *   3. 영향도가 per-instance 스케일·색(채도↑)·법선 방향 오프셋·회전을 구동
+ *   4. THREE.MathUtils.damp 로 스프링 감쇠 → 성장/수축이 유기적으로 따라옴
+ *
+ * 드로우콜: 바위 1 + InstancedMesh 3 (이끼 A/B + 버섯) = 총 4.
+ */
+import * as THREE from 'three';
+import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ── 파라미터 ──────────────────────────────────────────────── */
+const COUNT        = 1200;  // 이끼 인스턴스 총 개수
+const MUSH_RATIO   = 0.04;  // 버섯 비율 (~4%)
+const NORMAL_Y_MIN = 0.15;  // 윗면 필터: normal.y > 0.15 인 곳만 산포
+const RADIUS       = 0.95;  // 커서 영향 반경
+const GROW         = 1.2;   // 최대 추가 성장 배율 (1 + 1.2 = 2.2x)
+const LAMBDA       = 5;     // damp 감쇠 계수 (4~6 권장)
+
+/* ── 렌더러 / 씬 / 카메라 ─────────────────────────────────── */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // DPR 상한 1.5
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0d0d10);
+scene.fog = new THREE.Fog(0x0d0d10, 6, 13); // 은은한 안개
+
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 50);
+const CAM_R = 4.6, CAM_Y = 2.5;             // 궤도 반경 / 높이
+camera.position.set(0, CAM_Y, CAM_R);
+camera.lookAt(0, 0.1, 0);
+
+/* ── 조명: 다크 미니멀 — 낮은 채도의 hemisphere + key light ── */
+scene.add(new THREE.HemisphereLight(0x9aa3b0, 0x14141a, 0.8));
+const key = new THREE.DirectionalLight(0xffffff, 1.4);
+key.position.set(3, 5, 2);
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x5a7fa0, 0.5); // 뒤쪽 푸른 림
+rim.position.set(-3, 2, -4);
+scene.add(rim);
+
+/* ── 베이스: 로우폴리 바위 (변형된 icosahedron, flat shading) ─ */
+const rockGeo = new THREE.IcosahedronGeometry(1.7, 3); // 비인덱스 → 면 단위 셰이딩
+{
+  const pos = rockGeo.attributes.position;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    // 위치 기반 결정적 유사 노이즈 — 같은 좌표는 같은 변위 → 이음새 유지
+    const n = 0.22 * Math.sin(v.x * 2.1 + 1.7) * Math.sin(v.y * 2.7 + 0.4)
+            + 0.14 * Math.sin(v.z * 3.3 + 2.2) * Math.sin(v.x * 1.6)
+            + 0.10 * Math.sin((v.x + v.y + v.z) * 4.0);
+    v.multiplyScalar(1 + n);
+    v.y *= 0.72; // 납작하게 눌러 바위 느낌
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  rockGeo.computeVertexNormals();
+}
+const rock = new THREE.Mesh(
+  rockGeo,
+  new THREE.MeshStandardMaterial({ color: 0x26262c, flatShading: true, roughness: 0.95 })
+);
+scene.add(rock);
+
+/* ── 표면 샘플링: 윗면(normal.y > 0.15)에만 산포 ───────────── */
+const sampler = new MeshSurfaceSampler(rock).build();
+const samples = []; // { pos, normal }
+{
+  const p = new THREE.Vector3(), n = new THREE.Vector3();
+  let guard = 0;
+  while (samples.length < COUNT && guard++ < COUNT * 40) {
+    sampler.sample(p, n);
+    if (n.y > NORMAL_Y_MIN) samples.push({ pos: p.clone(), normal: n.clone() });
+  }
+}
+
+/* ── 인스턴스 지오메트리: 이끼 덩어리 2종 + 버섯 ───────────── */
+// A: 눌린 icosahedron 덩어리 (20 tri)
+const clumpA = new THREE.IcosahedronGeometry(0.055, 0);
+clumpA.scale(1, 0.75, 1);
+// B: 낮은 원뿔 봉오리 (5각 옆면 + 바닥, ~10 tri)
+const clumpB = new THREE.ConeGeometry(0.045, 0.1, 5);
+clumpB.translate(0, 0.05, 0);
+// 버섯: 줄기 + 갓 merge, 정점색으로 부위 구분 (인스턴스색이 곱해짐)
+const stemGeo = new THREE.CylinderGeometry(0.014, 0.02, 0.11, 5);
+stemGeo.translate(0, 0.055, 0);
+const capGeo = new THREE.SphereGeometry(0.045, 6, 3, 0, Math.PI * 2, 0, Math.PI * 0.55);
+capGeo.scale(1, 0.8, 1);
+capGeo.translate(0, 0.1, 0);
+function paintVertexColor(geo, hex) { // 지오메트리 전체를 단색 정점색으로
+  const c = new THREE.Color(hex);
+  const arr = new Float32Array(geo.attributes.position.count * 3);
+  for (let i = 0; i < arr.length; i += 3) { arr[i] = c.r; arr[i + 1] = c.g; arr[i + 2] = c.b; }
+  geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+}
+paintVertexColor(stemGeo, 0xb8b2a2);   // 줄기: 약간 어두운 베이지
+paintVertexColor(capGeo, 0xd8d4c8);    // 갓: 옅은 크림
+const mushGeo = mergeGeometries([stemGeo, capGeo]);
+
+/* ── 이끼 팔레트: 짙은 초록 → 커서 근처에서 밝은 초록 ─────── */
+const MOSS_BASE   = new THREE.Color(0x2e6e52);
+const MOSS_BRIGHT = new THREE.Color(0x5aa87a);
+const MUSH_BASE   = new THREE.Color(0xffffff);   // 정점색이 실색 담당
+const MUSH_BRIGHT = new THREE.Color(0xfff6dd);   // 근접 시 살짝 따뜻하게
+
+/* ── 샘플을 3그룹으로 배분하고 InstancedMesh 구성 ──────────── */
+const mossMat = new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.9 });
+const mushMat = new THREE.MeshStandardMaterial({ flatShading: true, roughness: 0.8, vertexColors: true });
+
+const groups = [
+  { geo: clumpA,  mat: mossMat, base: MOSS_BASE, bright: MOSS_BRIGHT, items: [] },
+  { geo: clumpB,  mat: mossMat, base: MOSS_BASE, bright: MOSS_BRIGHT, items: [] },
+  { geo: mushGeo, mat: mushMat, base: MUSH_BASE, bright: MUSH_BRIGHT, items: [] },
+];
+
+const UP = new THREE.Vector3(0, 1, 0);
+for (const s of samples) {
+  const r = Math.random();
+  const g = r < MUSH_RATIO ? groups[2] : (r < 0.5 + MUSH_RATIO / 2 ? groups[0] : groups[1]);
+  const quat = new THREE.Quaternion().setFromUnitVectors(UP, s.normal); // 법선 정렬
+  quat.multiply(new THREE.Quaternion().setFromAxisAngle(UP, Math.random() * Math.PI * 2)); // 랜덤 요
+  const isMush = g === groups[2];
+  const baseColor = g.base.clone();
+  if (!isMush) baseColor.offsetHSL((Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.15, (Math.random() - 0.5) * 0.1);
+  g.items.push({
+    pos: s.pos, normal: s.normal, quat,
+    baseScale: isMush ? 0.8 + Math.random() * 0.5 : 0.6 + Math.random() * 0.9,
+    baseColor,
+    phase: Math.random() * Math.PI * 2, // 숨쉬기 위상
+    infl: 0,                            // 현재 영향도 (damp 대상)
+  });
+}
+
+for (const g of groups) {
+  g.mesh = new THREE.InstancedMesh(g.geo, g.mat, g.items.length);
+  g.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  scene.add(g.mesh);
+}
+
+/* ── 커서 표식: 교차점에 놓이는 은은한 점 ──────────────────── */
+const cursorDot = new THREE.Mesh(
+  new THREE.SphereGeometry(0.035, 8, 6),
+  new THREE.MeshBasicMaterial({ color: 0x8fdcae, transparent: true, opacity: 0.55 })
+);
+cursorDot.visible = false;
+scene.add(cursorDot);
+
+/* ── 인터랙션: 마우스 raycast + (입장 전) 가짜 커서 lissajous ─ */
+const raycaster = new THREE.Raycaster();
+const pointerNDC = new THREE.Vector2();
+let hasRealMouse = false;   // 한 번이라도 마우스가 들어왔는가
+let pointerInside = false;
+window.addEventListener('pointermove', (e) => {
+  hasRealMouse = true;
+  pointerInside = true;
+  pointerNDC.set((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+});
+window.addEventListener('pointerleave', () => { pointerInside = false; });
+document.addEventListener('mouseleave', () => { pointerInside = false; });
+
+const cursorPoint = new THREE.Vector3();
+let cursorActive = false;
+
+function updateCursor(t) {
+  let ndc = null;
+  if (hasRealMouse) {
+    if (pointerInside) ndc = pointerNDC;
+  } else {
+    // 자가 시연: 느린 lissajous 경로로 가짜 커서가 바위 위를 순회
+    ndc = new THREE.Vector2(0.4 * Math.sin(t * 0.37), 0.12 + 0.3 * Math.sin(t * 0.53 + 1.3));
+  }
+  cursorActive = false;
+  if (ndc) {
+    camera.updateMatrixWorld(); // 첫 렌더 전엔 matrixWorld가 stale — raycast 전 강제 갱신
+    raycaster.setFromCamera(ndc, camera);
+    const hit = raycaster.intersectObject(rock, false)[0];
+    if (hit) { cursorPoint.copy(hit.point); cursorActive = true; }
+  }
+  cursorDot.visible = cursorActive;
+  if (cursorActive) cursorDot.position.copy(cursorPoint).addScaledVector(rock.position, 0);
+}
+
+/* ── 매 프레임: 영향도 damp → 스케일/색/오프셋/회전 갱신 ────── */
+const _m = new THREE.Matrix4();
+const _q = new THREE.Quaternion();
+const _spin = new THREE.Quaternion();
+const _p = new THREE.Vector3();
+const _s = new THREE.Vector3();
+const _c = new THREE.Color();
+
+function updateInstances(t, dt, instant = false) {
+  for (const g of groups) {
+    for (let i = 0; i < g.items.length; i++) {
+      const it = g.items[i];
+      // 1) 근접 영향도: smoothstep 감쇠
+      let target = 0;
+      if (cursorActive) {
+        const d = it.pos.distanceTo(cursorPoint);
+        target = 1 - THREE.MathUtils.smoothstep(d, 0, RADIUS);
+      }
+      // 2) 스프링 감쇠 — 즉시 반응이 아니라 유기적으로 따라오게
+      it.infl = instant ? target : THREE.MathUtils.damp(it.infl, target, LAMBDA, dt);
+
+      // 3) 스케일: 기본 크기(항상 보임) + 성장 + 미세 숨쉬기
+      const breath = 1 + 0.03 * Math.sin(t * 1.6 + it.phase);
+      const sc = it.baseScale * (1 + GROW * it.infl) * breath;
+      _s.setScalar(sc);
+
+      // 4) 법선 방향 살짝 밀어올리기 + 법선축 소회전
+      _p.copy(it.pos).addScaledVector(it.normal, 0.05 * it.infl);
+      _spin.setFromAxisAngle(it.normal, 0.45 * it.infl + 0.04 * Math.sin(t + it.phase));
+      _q.copy(_spin).multiply(it.quat);
+
+      _m.compose(_p, _q, _s);
+      g.mesh.setMatrixAt(i, _m);
+
+      // 5) 색: 근접할수록 밝고 채도 높은 초록으로
+      _c.lerpColors(it.baseColor, g.bright, it.infl);
+      g.mesh.setColorAt(i, _c);
+    }
+    g.mesh.instanceMatrix.needsUpdate = true;
+    if (g.mesh.instanceColor) g.mesh.instanceColor.needsUpdate = true;
+  }
+}
+
+/* ── 카메라: 아주 느린 궤도 드리프트 ───────────────────────── */
+function updateCamera(t) {
+  const a = t * 0.05;
+  camera.position.set(Math.sin(a) * CAM_R, CAM_Y + 0.15 * Math.sin(t * 0.11), Math.cos(a) * CAM_R);
+  camera.lookAt(0, 0.1, 0);
+}
+
+/* ── 루프 / 가시성 / 리사이즈 / reduced-motion ─────────────── */
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  if (reducedMotion) renderer.render(scene, camera);
+});
+
+if (reducedMotion) {
+  // 모션 축소 환경: 루프 없이 1회 정적 렌더 (효과는 고정 지점에 적용해 보여줌)
+  camera.updateMatrixWorld(); // 첫 렌더 전 raycast 대비
+  raycaster.setFromCamera(new THREE.Vector2(0.15, 0.3), camera);
+  const hit = raycaster.intersectObject(rock, false)[0];
+  if (hit) { cursorPoint.copy(hit.point); cursorActive = true; cursorDot.visible = true; cursorDot.position.copy(hit.point); }
+  updateInstances(0, 0, true);
+  renderer.render(scene, camera);
+} else {
+  const clock = new THREE.Clock();
+  let paused = false;
+  document.addEventListener('visibilitychange', () => { // 탭 비활성 시 렌더 중지
+    paused = document.hidden;
+    if (!paused) clock.getDelta(); // 복귀 시 dt 점프 방지
+  });
+  renderer.setAnimationLoop(() => {
+    if (paused) return;
+    const dt = Math.min(clock.getDelta(), 0.1);
+    const t = clock.elapsedTime;
+    updateCamera(t);
+    updateCursor(t);
+    updateInstances(t, dt);
+    renderer.render(scene, camera);
+  });
+}
+</script>
+</body>
+</html>
