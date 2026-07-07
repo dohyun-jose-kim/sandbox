@@ -1,70 +1,842 @@
-<!doctype html>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bottles · sandbox — dohyun-jose-kim</title>
-<meta name="description" content="Bottles — a sandbox section under construction.">
+<meta name="description" content="墨流し ink bleed — GPU stable-fluids ink simulation. Hover to ripple, drag to pour ink.">
 <style>
-  :root{
-    --sky-0:#ff4d2e; --sky-1:#ff7a3d; --sky-2:#ffa969; --sky-3:#ffd2a0;
-    --sun:#fff1cf;
-    --sand-top:#ffe1a6; --sand-2:#f6c476; --sand-3:#e2a458; --sand-sh:#c5853f;
-    --pink:#ff3d8b; --cream:#fff4e8; --ink:#5d2a14; --muted:#b06a2e;
-    --font:"SF Pro Rounded", ui-rounded, "Quicksand", "Hiragino Maru Gothic Pro", system-ui, -apple-system, sans-serif;
+  /* ── 다크 미니멀 테마 ─────────────────────────────────────────── */
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%;
+    background: #0d0d10;            /* 어두운 종이색 (셰이더 배경과 동일) */
+    overflow: hidden;
+    font-family: -apple-system, "Helvetica Neue", "Apple SD Gothic Neo",
+                 "Noto Sans KR", sans-serif;
   }
-  .night{
-    --sky-0:#10162e; --sky-1:#1d2547; --sky-2:#2c3460; --sky-3:#46406e;
-    --sun:#cdd6ff;
+  canvas#fluid {
+    display: block;
+    width: 100vw; height: 100vh;
+    cursor: crosshair;
+    touch-action: none;             /* 모바일에서 스크롤 대신 드래그 */
   }
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%}
-  body{
-    font-family:var(--font);
-    background:linear-gradient(180deg,var(--sky-0) 0%,var(--sky-1) 34%,var(--sky-2) 62%,var(--sky-3) 100%);
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    min-height:100vh; overflow:hidden; text-align:center; color:var(--cream);
-    transition:background .5s;
+  /* ── 최소 UI: 좌상단 타이틀 + 힌트 + 씻어내기 버튼 ───────────── */
+  .ui {
+    position: fixed; top: 22px; left: 26px;
+    color: #d8d4c8;
+    pointer-events: none;           /* 캔버스 인터랙션 방해 금지 */
+    user-select: none;
   }
-  .glow{
-    position:fixed; left:50%; top:26%; width:min(60vmin,420px); height:min(60vmin,420px);
-    transform:translate(-50%,-50%); border-radius:50%;
-    background:radial-gradient(circle, var(--sun) 0%, transparent 62%);
-    opacity:.85; pointer-events:none;
+  .ui h1 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    opacity: 0.85;
   }
-  main{position:relative; padding:24px}
-  .emoji{font-size:clamp(64px,16vmin,120px); line-height:1; display:block; animation:bob 3.2s ease-in-out infinite}
-  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-  h1{
-    margin:18px 0 8px; font-size:clamp(38px,9vmin,72px); font-weight:800; letter-spacing:.06em;
-    text-transform:uppercase; text-shadow:0 3px 0 rgba(93,42,20,.25);
+  .ui p.hint {
+    margin: 7px 0 0;
+    font-size: 11.5px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    opacity: 0.42;
   }
-  .msg{margin:0; font-size:clamp(14px,2.6vmin,18px); font-weight:700; opacity:.95}
-  .msg small{display:block; margin-top:6px; font-weight:600; opacity:.85}
-  .back{
-    display:inline-block; margin-top:34px; padding:12px 22px; border-radius:999px;
-    background:var(--cream); color:var(--ink); font-weight:800; font-size:15px;
-    text-decoration:none; box-shadow:0 4px 0 rgba(93,42,20,.28);
-    transition:transform .15s;
+  button#wash {
+    pointer-events: auto;           /* UI 컨테이너만 통과, 버튼은 클릭 가능 */
+    margin-top: 14px;
+    padding: 5px 13px;
+    background: transparent;
+    color: #d8d4c8;
+    border: 1px solid rgba(216, 212, 200, 0.25);
+    border-radius: 3px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    font-family: inherit;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity .25s, border-color .25s;
   }
-  .back:hover{transform:translateY(-2px)}
-  .sand{
-    position:fixed; left:50%; bottom:-14vmin; width:150vmax; height:26vmin; min-height:150px;
-    transform:translateX(-50%); border-radius:50% 50% 0 0 / 100% 100% 0 0;
-    background:linear-gradient(180deg,var(--sand-top),var(--sand-2) 55%,var(--sand-3));
-    box-shadow:inset 0 10px 24px rgba(197,133,63,.35);
+  button#wash:hover { opacity: 1; border-color: rgba(216, 212, 200, 0.55); }
+  button#wash:active { opacity: 0.4; }
+  /* sandbox 홈으로 돌아가기 (셸 페이지 관례) */
+  a.back {
+    position: fixed; top: 22px; right: 26px;
+    color: #d8d4c8; text-decoration: none;
+    font-size: 11.5px; letter-spacing: 0.06em;
+    opacity: 0.45; transition: opacity .25s;
   }
-  @media (prefers-reduced-motion: reduce){ .emoji{animation:none} }
+  a.back:hover { opacity: 1; }
+  /* ── WebGL 미지원 폴백 문구 ──────────────────────────────────── */
+  .fallback {
+    position: fixed; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    color: #8a877e; font-size: 13px; letter-spacing: 0.05em;
+    text-align: center; line-height: 1.8;
+  }
 </style>
-<div class="glow"></div>
-<div class="sand"></div>
-<main>
-  <span class="emoji" aria-hidden="true">🍾</span>
-  <h1>Bottles</h1>
-  <p class="msg">under construction — still building this sandcastle
-    <small>아직 모래성을 쌓는 중이에요</small>
-  </p>
-  <a class="back" href="../">← back to the sandbox</a>
-</main>
+</head>
+<body>
+
+<canvas id="fluid"></canvas>
+
+<div class="ui">
+  <h1>墨流し — Ink Bleed</h1>
+  <p class="hint">호버 = 물결, 드래그 = 잉크</p>
+  <button id="wash" type="button">씻어내기</button>
+</div>
+
+<a class="back" href="../">← back to the sandbox</a>
+
+<div class="fallback" id="fallback">
+  이 브라우저는 WebGL(half-float 텍스처)을 지원하지 않아<br>
+  잉크 시뮬레이션을 표시할 수 없습니다.
+</div>
+
 <script>
-  // follow the landing's day/night choice (same localStorage key)
-  try{ if(localStorage.getItem('sb-theme')==='night') document.documentElement.classList.add('night'); }catch(e){}
+'use strict';
+/* ═══════════════════════════════════════════════════════════════════
+ * 墨流し (스미나가시) — GPU Stable Fluids 잉크 번짐 프로토타입 (다크)
+ *
+ * 구조: GPU Gems ch.38 / Pavel Dobryakov WebGL-Fluid-Simulation(MIT) 계열
+ *  - 속도장(velocity) ~256px, 염료장(dye) ~1024px, 핑퐁 더블 FBO
+ *  - 매 프레임: curl → vorticity confinement → divergence
+ *              → pressure Jacobi(24회, decay 0.8) → gradient subtract
+ *              → advect velocity(dissipation 0.16) → advect dye(0.07)
+ *  - 입력: 가우시안 splat. 호버 = 속도만(물결), 드래그 = 염료 주입(잉크)
+ *  - 원본(hayashimon1)은 밝은 종이 + Beer–Lambert 감산혼합.
+ *    여기서는 다크 테마라서 반전: 어두운 종이(#0d0d10) 위에
+ *    저채도 발광 잉크를 "가산" 혼합 (display 셰이더에서 bg + dye).
+ * ═══════════════════════════════════════════════════════════════════ */
+
+(function () {
+
+/* ── 튜닝 파라미터 ─────────────────────────────────────────────── */
+const config = {
+  SIM_RESOLUTION: 256,        // 속도/압력장 해상도
+  DYE_RESOLUTION: 1024,       // 염료장 해상도 (번짐 디테일)
+  DENSITY_DISSIPATION: 0.07,  // 염료 소산 (낮을수록 잉크가 오래 남음)
+  VELOCITY_DISSIPATION: 0.16, // 속도 소산
+  PRESSURE_DECAY: 0.8,        // 압력장 프레임간 감쇠
+  PRESSURE_ITERATIONS: 24,    // Jacobi 반복 횟수
+  CURL: 14,                   // vorticity confinement 강도 (소용돌이 유지)
+  SPLAT_RADIUS: 0.0026,       // splat 반경 (화면비 보정 전, 상대값)
+  SPLAT_FORCE: 6000,          // 드래그 속도 → splat 힘 배율
+  HOVER_FORCE: 2600,          // 호버(물결)는 더 부드럽게
+  WASH_DISSIPATION: 5.0,      // "씻어내기" 중 임시 염료 소산
+  WASH_DURATION: 2200,        // 씻어내기 지속(ms)
+  IDLE_AFTER: 3000,           // 이 시간(ms) 동안 입력 없으면 자동 낙하 시작
+  DPR_CAP: 1.5,               // devicePixelRatio 상한
+};
+
+/* 다크 종이 위 발광 잉크 팔레트 (저채도) */
+const PAPER = [0.051, 0.051, 0.063];  // #0d0d10
+const INKS = [
+  [0.788, 0.659, 0.416],  // #c9a86a 뮤트 골드
+  [0.498, 0.706, 0.788],  // #7fb4c9 페일 시안
+  [0.541, 0.498, 0.788],  // #8a7fc9 소프트 바이올렛
+  [0.847, 0.831, 0.784],  // #d8d4c8 본 화이트
+];
+
+const canvas = document.getElementById('fluid');
+const washBtn = document.getElementById('wash');
+const reducedMotion =
+  window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ══ 1. WebGL 컨텍스트 획득 (WebGL2 우선, WebGL1 폴백) ══════════ */
+function getWebGLContext(canvas) {
+  const params = { alpha: false, depth: false, stencil: false,
+                   antialias: false, preserveDrawingBuffer: false };
+
+  let gl = canvas.getContext('webgl2', params);
+  const isWebGL2 = !!gl;
+  if (!isWebGL2)
+    gl = canvas.getContext('webgl', params) ||
+         canvas.getContext('experimental-webgl', params);
+  if (!gl) return null;
+
+  let halfFloatTexType, supportLinearFiltering;
+  if (isWebGL2) {
+    // WebGL2: half-float 렌더타겟에 EXT_color_buffer_float 필요.
+    //         half-float 선형 필터링은 코어 기능.
+    if (!gl.getExtension('EXT_color_buffer_float')) return null;
+    halfFloatTexType = gl.HALF_FLOAT;
+    supportLinearFiltering = true;
+  } else {
+    // WebGL1: half-float 텍스처 + (가능하면) 선형 필터링 확장
+    const halfFloat = gl.getExtension('OES_texture_half_float');
+    if (!halfFloat) return null;
+    halfFloatTexType = halfFloat.HALF_FLOAT_OES;
+    supportLinearFiltering = !!gl.getExtension('OES_texture_half_float_linear');
+  }
+
+  const internalFormat = isWebGL2 ? gl.RGBA16F : gl.RGBA;
+
+  // half-float FBO에 실제로 렌더 가능한지 확인
+  if (!supportRenderTexture(gl, internalFormat, gl.RGBA, halfFloatTexType))
+    return null;
+
+  return { gl, isWebGL2, halfFloatTexType, internalFormat, supportLinearFiltering };
+}
+
+function supportRenderTexture(gl, internalFormat, format, type) {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, 4, 4, 0, format, type, null);
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+                          gl.TEXTURE_2D, tex, 0);
+  const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.deleteFramebuffer(fbo);
+  gl.deleteTexture(tex);
+  return ok;
+}
+
+const ctx = getWebGLContext(canvas);
+if (!ctx) {
+  canvas.style.display = 'none';
+  document.getElementById('fallback').style.display = 'flex';
+  return;
+}
+const { gl, halfFloatTexType, internalFormat, supportLinearFiltering } = ctx;
+
+/* ══ 2. 셰이더 소스 (GLSL ES 1.00 — WebGL1/2 공용) ══════════════ */
+
+// 공용 정점 셰이더: 풀스크린 쿼드 + 이웃 texel 좌표(vL/vR/vT/vB) 미리 계산
+const VERT = `
+  precision highp float;
+  attribute vec2 aPosition;
+  varying vec2 vUv, vL, vR, vT, vB;
+  uniform vec2 texelSize;
+  void main () {
+    vUv = aPosition * 0.5 + 0.5;
+    vL = vUv - vec2(texelSize.x, 0.0);
+    vR = vUv + vec2(texelSize.x, 0.0);
+    vT = vUv + vec2(0.0, texelSize.y);
+    vB = vUv - vec2(0.0, texelSize.y);
+    gl_Position = vec4(aPosition, 0.0, 1.0);
+  }`;
+
+// 단순 복사 (FBO 리사이즈용)
+const COPY_FRAG = `
+  precision mediump float; precision mediump sampler2D;
+  varying vec2 vUv;
+  uniform sampler2D uTexture;
+  void main () { gl_FragColor = texture2D(uTexture, vUv); }`;
+
+// 스칼라 곱 (압력장 감쇠용)
+const CLEAR_FRAG = `
+  precision mediump float; precision mediump sampler2D;
+  varying vec2 vUv;
+  uniform sampler2D uTexture;
+  uniform float value;
+  void main () { gl_FragColor = value * texture2D(uTexture, vUv); }`;
+
+// 가우시안 splat: 기존 장에 exp(-d²/r)·color 를 더한다
+const SPLAT_FRAG = `
+  precision highp float; precision highp sampler2D;
+  varying vec2 vUv;
+  uniform sampler2D uTarget;
+  uniform float aspectRatio;
+  uniform vec3 color;
+  uniform vec2 point;
+  uniform float radius;
+  void main () {
+    vec2 p = vUv - point.xy;
+    p.x *= aspectRatio;
+    vec3 splat = exp(-dot(p, p) / radius) * color;
+    vec3 base = texture2D(uTarget, vUv).xyz;
+    gl_FragColor = vec4(base + splat, 1.0);
+  }`;
+
+// semi-Lagrangian 이류: 속도를 거슬러 올라가 샘플링
+const ADVECTION_FRAG = `
+  precision highp float; precision highp sampler2D;
+  varying vec2 vUv;
+  uniform sampler2D uVelocity;
+  uniform sampler2D uSource;
+  uniform vec2 texelSize;
+  uniform float dt;
+  uniform float dissipation;
+  void main () {
+    vec2 coord = vUv - dt * texture2D(uVelocity, vUv).xy * texelSize;
+    vec4 result = texture2D(uSource, coord);
+    float decay = 1.0 + dissipation * dt;
+    gl_FragColor = result / decay;
+  }`;
+
+// 발산: ∇·v (경계에서 no-slip 반사)
+const DIVERGENCE_FRAG = `
+  precision mediump float; precision mediump sampler2D;
+  varying vec2 vUv, vL, vR, vT, vB;
+  uniform sampler2D uVelocity;
+  void main () {
+    float L = texture2D(uVelocity, vL).x;
+    float R = texture2D(uVelocity, vR).x;
+    float T = texture2D(uVelocity, vT).y;
+    float B = texture2D(uVelocity, vB).y;
+    vec2 C = texture2D(uVelocity, vUv).xy;
+    if (vL.x < 0.0) { L = -C.x; }
+    if (vR.x > 1.0) { R = -C.x; }
+    if (vT.y > 1.0) { T = -C.y; }
+    if (vB.y < 0.0) { B = -C.y; }
+    float div = 0.5 * (R - L + T - B);
+    gl_FragColor = vec4(div, 0.0, 0.0, 1.0);
+  }`;
+
+// 소용돌이도: ∇×v (2D 스칼라)
+const CURL_FRAG = `
+  precision mediump float; precision mediump sampler2D;
+  varying vec2 vUv, vL, vR, vT, vB;
+  uniform sampler2D uVelocity;
+  void main () {
+    float L = texture2D(uVelocity, vL).y;
+    float R = texture2D(uVelocity, vR).y;
+    float T = texture2D(uVelocity, vT).x;
+    float B = texture2D(uVelocity, vB).x;
+    float vorticity = R - L - T + B;
+    gl_FragColor = vec4(0.5 * vorticity, 0.0, 0.0, 1.0);
+  }`;
+
+// vorticity confinement: 수치확산으로 사라지는 소용돌이를 되살림
+const VORTICITY_FRAG = `
+  precision highp float; precision highp sampler2D;
+  varying vec2 vUv, vL, vR, vT, vB;
+  uniform sampler2D uVelocity;
+  uniform sampler2D uCurl;
+  uniform float curl;
+  uniform float dt;
+  void main () {
+    float L = texture2D(uCurl, vL).x;
+    float R = texture2D(uCurl, vR).x;
+    float T = texture2D(uCurl, vT).x;
+    float B = texture2D(uCurl, vB).x;
+    float C = texture2D(uCurl, vUv).x;
+    vec2 force = 0.5 * vec2(abs(T) - abs(B), abs(R) - abs(L));
+    force /= length(force) + 0.0001;
+    force *= curl * C;
+    force.y *= -1.0;
+    vec2 velocity = texture2D(uVelocity, vUv).xy;
+    velocity += force * dt;
+    velocity = min(max(velocity, -1000.0), 1000.0);
+    gl_FragColor = vec4(velocity, 0.0, 1.0);
+  }`;
+
+// 압력 Jacobi 반복: ∇²p = ∇·v 풀기
+const PRESSURE_FRAG = `
+  precision mediump float; precision mediump sampler2D;
+  varying vec2 vUv, vL, vR, vT, vB;
+  uniform sampler2D uPressure;
+  uniform sampler2D uDivergence;
+  void main () {
+    float L = texture2D(uPressure, vL).x;
+    float R = texture2D(uPressure, vR).x;
+    float T = texture2D(uPressure, vT).x;
+    float B = texture2D(uPressure, vB).x;
+    float divergence = texture2D(uDivergence, vUv).x;
+    float pressure = (L + R + B + T - divergence) * 0.25;
+    gl_FragColor = vec4(pressure, 0.0, 0.0, 1.0);
+  }`;
+
+// 압력 기울기 빼기 → 비압축(발산 0) 속도장으로 사영
+const GRADIENT_SUBTRACT_FRAG = `
+  precision mediump float; precision mediump sampler2D;
+  varying vec2 vUv, vL, vR, vT, vB;
+  uniform sampler2D uPressure;
+  uniform sampler2D uVelocity;
+  void main () {
+    float L = texture2D(uPressure, vL).x;
+    float R = texture2D(uPressure, vR).x;
+    float T = texture2D(uPressure, vT).x;
+    float B = texture2D(uPressure, vB).x;
+    vec2 velocity = texture2D(uVelocity, vUv).xy;
+    velocity.xy -= vec2(R - L, T - B);
+    gl_FragColor = vec4(velocity, 0.0, 1.0);
+  }`;
+
+// 최종 표시: 어두운 종이 + 가산 잉크 + 종이 결(밸류 노이즈 2~3옥타브) + 비네트
+const DISPLAY_FRAG = `
+  precision highp float; precision highp sampler2D;
+  varying vec2 vUv;
+  uniform sampler2D uTexture;
+  uniform vec2 uResolution;   // 캔버스 픽셀 크기 (노이즈 스케일용)
+
+  float hash (vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+  }
+  float vnoise (vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i),                 hash(i + vec2(1.0, 0.0)), f.x),
+               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x),
+               f.y);
+  }
+
+  void main () {
+    vec3 dye = texture2D(uTexture, vUv).rgb;
+    vec3 paper = vec3(0.051, 0.051, 0.063);   // #0d0d10
+
+    // 다크 종이 위 가산 혼합 (원본의 Beer-Lambert 감산의 반전)
+    vec3 color = paper + dye;
+
+    // 종이 결: 밸류 노이즈 3옥타브, 아주 미세하게
+    vec2 px = vUv * uResolution;
+    float grain = vnoise(px * 0.055) * 0.5
+                + vnoise(px * 0.16)  * 0.3
+                + vnoise(px * 0.65)  * 0.2;
+    color += (grain - 0.5) * 0.028;
+
+    // 부드러운 가장자리 비네트
+    vec2 d = vUv - 0.5;
+    float vig = smoothstep(0.95, 0.35, length(d) * 1.15);
+    color *= mix(0.82, 1.0, vig);
+
+    gl_FragColor = vec4(color, 1.0);
+  }`;
+
+/* ══ 3. 프로그램/FBO 헬퍼 ═══════════════════════════════════════ */
+
+function compileShader(type, source) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+    throw new Error('Shader compile error: ' + gl.getShaderInfoLog(shader));
+  return shader;
+}
+
+function createProgram(fragSource) {
+  const program = gl.createProgram();
+  gl.attachShader(program, compileShader(gl.VERTEX_SHADER, VERT));
+  gl.attachShader(program, compileShader(gl.FRAGMENT_SHADER, fragSource));
+  gl.bindAttribLocation(program, 0, 'aPosition');
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS))
+    throw new Error('Program link error: ' + gl.getProgramInfoLog(program));
+  // uniform 위치를 이름으로 미리 수집
+  const uniforms = {};
+  const count = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS);
+  for (let i = 0; i < count; i++) {
+    const name = gl.getActiveUniform(program, i).name;
+    uniforms[name] = gl.getUniformLocation(program, name);
+  }
+  return { program, uniforms, bind() { gl.useProgram(this.program); } };
+}
+
+const copyProgram       = createProgram(COPY_FRAG);
+const clearProgram      = createProgram(CLEAR_FRAG);
+const splatProgram      = createProgram(SPLAT_FRAG);
+const advectionProgram  = createProgram(ADVECTION_FRAG);
+const divergenceProgram = createProgram(DIVERGENCE_FRAG);
+const curlProgram       = createProgram(CURL_FRAG);
+const vorticityProgram  = createProgram(VORTICITY_FRAG);
+const pressureProgram   = createProgram(PRESSURE_FRAG);
+const gradSubProgram    = createProgram(GRADIENT_SUBTRACT_FRAG);
+const displayProgram    = createProgram(DISPLAY_FRAG);
+
+// 풀스크린 쿼드 + 그리기 함수
+const blit = (() => {
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ARRAY_BUFFER,
+    new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]), gl.STATIC_DRAW);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer());
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
+    new Uint16Array([0, 1, 2, 0, 2, 3]), gl.STATIC_DRAW);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(0);
+  return (target) => {
+    if (target == null) {
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    } else {
+      gl.viewport(0, 0, target.width, target.height);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+    }
+    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+  };
+})();
+
+function createFBO(w, h, filter) {
+  gl.activeTexture(gl.TEXTURE0);
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, w, h, 0,
+                gl.RGBA, halfFloatTexType, null);
+
+  const fbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+                          gl.TEXTURE_2D, texture, 0);
+  gl.clearColor(0, 0, 0, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  return {
+    texture, fbo, width: w, height: h,
+    texelSizeX: 1 / w, texelSizeY: 1 / h,
+    attach(id) {
+      gl.activeTexture(gl.TEXTURE0 + id);
+      gl.bindTexture(gl.TEXTURE_2D, this.texture);
+      return id;
+    },
+  };
+}
+
+// 핑퐁 더블 FBO: read에서 읽고 write에 쓴 뒤 swap
+function createDoubleFBO(w, h, filter) {
+  return {
+    width: w, height: h,
+    texelSizeX: 1 / w, texelSizeY: 1 / h,
+    read: createFBO(w, h, filter),
+    write: createFBO(w, h, filter),
+    swap() { const t = this.read; this.read = this.write; this.write = t; },
+  };
+}
+
+// 리사이즈: 새 FBO에 기존 내용을 복사해서 유지
+function resizeFBO(target, w, h, filter) {
+  const newFBO = createFBO(w, h, filter);
+  copyProgram.bind();
+  gl.uniform1i(copyProgram.uniforms.uTexture, target.attach(0));
+  blit(newFBO);
+  return newFBO;
+}
+function resizeDoubleFBO(target, w, h, filter) {
+  if (target.width === w && target.height === h) return target;
+  target.read = resizeFBO(target.read, w, h, filter);
+  gl.deleteFramebuffer(target.write.fbo);
+  gl.deleteTexture(target.write.texture);
+  target.write = createFBO(w, h, filter);
+  target.width = w; target.height = h;
+  target.texelSizeX = 1 / w; target.texelSizeY = 1 / h;
+  return target;
+}
+
+// 요청 해상도 → 화면비 반영한 실제 FBO 크기
+function getResolution(resolution) {
+  let aspect = gl.drawingBufferWidth / gl.drawingBufferHeight;
+  if (aspect < 1) aspect = 1 / aspect;
+  const min = Math.round(resolution);
+  const max = Math.round(resolution * aspect);
+  return gl.drawingBufferWidth > gl.drawingBufferHeight
+    ? { width: max, height: min }
+    : { width: min, height: max };
+}
+
+/* ══ 4. 시뮬레이션 장 초기화 ════════════════════════════════════ */
+const filtering = supportLinearFiltering ? gl.LINEAR : gl.NEAREST;
+
+let dye, velocity, divergence, curl, pressure;
+function initFramebuffers() {
+  const simRes = getResolution(config.SIM_RESOLUTION);
+  const dyeRes = getResolution(config.DYE_RESOLUTION);
+  if (!dye) {
+    dye      = createDoubleFBO(dyeRes.width, dyeRes.height, filtering);
+    velocity = createDoubleFBO(simRes.width, simRes.height, filtering);
+  } else {
+    dye      = resizeDoubleFBO(dye, dyeRes.width, dyeRes.height, filtering);
+    velocity = resizeDoubleFBO(velocity, simRes.width, simRes.height, filtering);
+  }
+  // 아래 셋은 매 프레임 완전히 다시 쓰이므로 리사이즈시 그냥 새로 생성
+  divergence = createFBO(simRes.width, simRes.height, gl.NEAREST);
+  curl       = createFBO(simRes.width, simRes.height, gl.NEAREST);
+  pressure   = createDoubleFBO(simRes.width, simRes.height, gl.NEAREST);
+}
+
+function resizeCanvas() {
+  const dpr = Math.min(window.devicePixelRatio || 1, config.DPR_CAP);
+  const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+  const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w; canvas.height = h;
+    return true;
+  }
+  return false;
+}
+
+resizeCanvas();
+initFramebuffers();
+
+/* ══ 5. Splat (입력 → 장에 주입) ════════════════════════════════ */
+function correctRadius(radius) {
+  const aspectRatio = canvas.width / canvas.height;
+  if (aspectRatio > 1) radius *= aspectRatio;
+  return radius;
+}
+
+// x,y: [0,1] 텍스처 좌표 (y는 아래→위)
+function splat(x, y, dx, dy, color, radiusScale) {
+  const radius = correctRadius(config.SPLAT_RADIUS * (radiusScale || 1));
+
+  // 1) 속도장에 힘 주입
+  splatProgram.bind();
+  gl.uniform1i(splatProgram.uniforms.uTarget, velocity.read.attach(0));
+  gl.uniform1f(splatProgram.uniforms.aspectRatio, canvas.width / canvas.height);
+  gl.uniform2f(splatProgram.uniforms.point, x, y);
+  gl.uniform3f(splatProgram.uniforms.color, dx, dy, 0);
+  gl.uniform1f(splatProgram.uniforms.radius, radius);
+  blit(velocity.write);
+  velocity.swap();
+
+  // 2) 염료장에 잉크 주입 (color가 null이면 물결만)
+  if (color) {
+    gl.uniform1i(splatProgram.uniforms.uTarget, dye.read.attach(0));
+    gl.uniform3f(splatProgram.uniforms.color, color[0], color[1], color[2]);
+    blit(dye.write);
+    dye.swap();
+  }
+}
+
+/* ══ 6. 시뮬레이션 1스텝 ════════════════════════════════════════ */
+function step(dt) {
+  gl.disable(gl.BLEND);
+
+  // (a) curl: 소용돌이도 계산
+  curlProgram.bind();
+  gl.uniform2f(curlProgram.uniforms.texelSize, velocity.texelSizeX, velocity.texelSizeY);
+  gl.uniform1i(curlProgram.uniforms.uVelocity, velocity.read.attach(0));
+  blit(curl);
+
+  // (b) vorticity confinement: 소용돌이 복원력
+  vorticityProgram.bind();
+  gl.uniform2f(vorticityProgram.uniforms.texelSize, velocity.texelSizeX, velocity.texelSizeY);
+  gl.uniform1i(vorticityProgram.uniforms.uVelocity, velocity.read.attach(0));
+  gl.uniform1i(vorticityProgram.uniforms.uCurl, curl.attach(1));
+  gl.uniform1f(vorticityProgram.uniforms.curl, config.CURL);
+  gl.uniform1f(vorticityProgram.uniforms.dt, dt);
+  blit(velocity.write);
+  velocity.swap();
+
+  // (c) divergence
+  divergenceProgram.bind();
+  gl.uniform2f(divergenceProgram.uniforms.texelSize, velocity.texelSizeX, velocity.texelSizeY);
+  gl.uniform1i(divergenceProgram.uniforms.uVelocity, velocity.read.attach(0));
+  blit(divergence);
+
+  // (d) 압력장 감쇠 후 Jacobi 반복
+  clearProgram.bind();
+  gl.uniform1i(clearProgram.uniforms.uTexture, pressure.read.attach(0));
+  gl.uniform1f(clearProgram.uniforms.value, config.PRESSURE_DECAY);
+  blit(pressure.write);
+  pressure.swap();
+
+  pressureProgram.bind();
+  gl.uniform2f(pressureProgram.uniforms.texelSize, velocity.texelSizeX, velocity.texelSizeY);
+  gl.uniform1i(pressureProgram.uniforms.uDivergence, divergence.attach(0));
+  for (let i = 0; i < config.PRESSURE_ITERATIONS; i++) {
+    gl.uniform1i(pressureProgram.uniforms.uPressure, pressure.read.attach(1));
+    blit(pressure.write);
+    pressure.swap();
+  }
+
+  // (e) gradient subtract → 발산 없는 속도장
+  gradSubProgram.bind();
+  gl.uniform2f(gradSubProgram.uniforms.texelSize, velocity.texelSizeX, velocity.texelSizeY);
+  gl.uniform1i(gradSubProgram.uniforms.uPressure, pressure.read.attach(0));
+  gl.uniform1i(gradSubProgram.uniforms.uVelocity, velocity.read.attach(1));
+  blit(velocity.write);
+  velocity.swap();
+
+  // (f) 속도 자기 이류
+  advectionProgram.bind();
+  gl.uniform2f(advectionProgram.uniforms.texelSize, velocity.texelSizeX, velocity.texelSizeY);
+  gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.read.attach(0));
+  gl.uniform1i(advectionProgram.uniforms.uSource, velocity.read.attach(0));
+  gl.uniform1f(advectionProgram.uniforms.dt, dt);
+  gl.uniform1f(advectionProgram.uniforms.dissipation, config.VELOCITY_DISSIPATION);
+  blit(velocity.write);
+  velocity.swap();
+
+  // (g) 염료 이류 — "씻어내기" 중이면 소산을 크게
+  const washing = performance.now() < washUntil;
+  gl.uniform1i(advectionProgram.uniforms.uVelocity, velocity.read.attach(0));
+  gl.uniform1i(advectionProgram.uniforms.uSource, dye.read.attach(1));
+  gl.uniform1f(advectionProgram.uniforms.dissipation,
+    washing ? config.WASH_DISSIPATION : config.DENSITY_DISSIPATION);
+  blit(dye.write);
+  dye.swap();
+}
+
+/* ══ 7. 화면 표시 ═══════════════════════════════════════════════ */
+function render() {
+  displayProgram.bind();
+  gl.uniform2f(displayProgram.uniforms.texelSize, dye.texelSizeX, dye.texelSizeY);
+  gl.uniform1i(displayProgram.uniforms.uTexture, dye.read.attach(0));
+  gl.uniform2f(displayProgram.uniforms.uResolution, canvas.width, canvas.height);
+  blit(null);
+}
+
+/* ══ 8. 입력 처리 ═══════════════════════════════════════════════ */
+const pointer = {
+  down: false, moved: false,
+  x: 0.5, y: 0.5, dx: 0, dy: 0,
+  colorIdx: 0,
+};
+let lastInteraction = performance.now();
+let washUntil = 0;
+
+function updatePointer(e, isDown) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = 1.0 - (e.clientY - rect.top) / rect.height;  // GL 좌표계로 뒤집기
+  pointer.dx = x - pointer.x;
+  pointer.dy = y - pointer.y;
+  pointer.x = x;
+  pointer.y = y;
+  pointer.moved = Math.abs(pointer.dx) > 0 || Math.abs(pointer.dy) > 0;
+  if (isDown !== undefined) pointer.down = isDown;
+  lastInteraction = performance.now();
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  updatePointer(e, true);
+  pointer.dx = 0; pointer.dy = 0;
+  pointer.colorIdx = (Math.random() * INKS.length) | 0;  // 드래그마다 잉크색 변경
+  // 누르는 순간 한 방울
+  splat(pointer.x, pointer.y, 0, 0, inkColor(pointer.colorIdx, 0.55), 2.2);
+});
+window.addEventListener('pointerup', () => { pointer.down = false; });
+canvas.addEventListener('pointermove', (e) => updatePointer(e));
+canvas.addEventListener('pointerleave', () => { pointer.moved = false; });
+
+washBtn.addEventListener('click', () => {
+  washUntil = performance.now() + config.WASH_DURATION;
+  lastInteraction = performance.now();
+});
+
+// 잉크색에 세기(intensity)를 곱해 splat용 색을 만든다
+function inkColor(idx, intensity) {
+  const c = INKS[idx % INKS.length];
+  return [c[0] * intensity, c[1] * intensity, c[2] * intensity];
+}
+
+// 매 프레임: 포인터 이동량을 힘으로 변환해 주입
+function applyPointerInput() {
+  if (!pointer.moved) return;
+  pointer.moved = false;
+  const force = pointer.down ? config.SPLAT_FORCE : config.HOVER_FORCE;
+  const dx = pointer.dx * force;
+  const dy = pointer.dy * force;
+  if (pointer.down) {
+    // 드래그: 잉크 + 물결
+    splat(pointer.x, pointer.y, dx, dy, inkColor(pointer.colorIdx, 0.35), 1.0);
+  } else {
+    // 호버: 물결만 (원본 데모의 시그니처 인터랙션)
+    splat(pointer.x, pointer.y, dx, dy, null, 1.6);
+  }
+}
+
+/* ══ 9. 유휴 자동 낙하 + 은은한 조류(ambient current) ═══════════ */
+let nextDropAt = 0;
+
+function autoDrop(now) {
+  const x = 0.15 + Math.random() * 0.7;
+  const y = 0.18 + Math.random() * 0.64;
+  const idx = (Math.random() * INKS.length) | 0;
+  const dx = (Math.random() - 0.5) * 120;
+  const dy = (Math.random() - 0.5) * 120;
+  splat(x, y, dx, dy, inkColor(idx, 0.55), 2.0 + Math.random() * 2.5);
+
+  // 30% 확률로 근처에 다른 색 한 방울 더 → 혼색 유도
+  if (Math.random() < 0.3) {
+    const x2 = Math.min(0.95, Math.max(0.05, x + (Math.random() - 0.5) * 0.16));
+    const y2 = Math.min(0.95, Math.max(0.05, y + (Math.random() - 0.5) * 0.16));
+    const idx2 = (idx + 1 + ((Math.random() * (INKS.length - 1)) | 0)) % INKS.length;
+    splat(x2, y2, -dx * 0.5, -dy * 0.5, inkColor(idx2, 0.38), 1.6 + Math.random() * 2.0);
+  }
+  nextDropAt = now + 2600 + Math.random() * 2600;   // 2.6~5.2초 간격
+}
+
+// 느린 사인 경로를 따라 도는 미약한 조류 (물 전체가 서서히 흐르는 느낌)
+// 매 프레임 주입되는 "가속"이므로 반드시 dt로 스케일해야 한다 —
+// 상수로 더하면 몇 초 만에 정상상태 속도가 수백이 되어 화면이 탁하게 뭉개짐
+function ambientCurrent(tSec, dt) {
+  const x = 0.5 + 0.33 * Math.sin(tSec * 0.21);
+  const y = 0.5 + 0.24 * Math.sin(tSec * 0.13 + 1.7);
+  // 경로의 접선 방향으로 약한 힘
+  const dx = 0.33 * 0.21 * Math.cos(tSec * 0.21);
+  const dy = 0.24 * 0.13 * Math.cos(tSec * 0.13 + 1.7);
+  splat(x, y, dx * 120 * dt, dy * 120 * dt, null, 4.0);
+}
+
+function maybeIdleBehavior(now, tSec, dt) {
+  if (now - lastInteraction < config.IDLE_AFTER) return;
+  ambientCurrent(tSec, dt);
+  if (now >= nextDropAt) {
+    if (nextDropAt === 0) nextDropAt = now;  // 유휴 진입 직후 첫 방울
+    autoDrop(now);
+  }
+}
+
+/* ══ 10. 초기 씨앗 잉크 — 첫 화면부터 아름답게 ══════════════════ */
+function seedInitialInk() {
+  // 속도를 약하게 — 세게 주면 거대한 버섯 기둥이 되어 화면 전체가 휘저어진다
+  splat(0.38, 0.58, 45, -22, inkColor(0, 0.65), 3.4);    // 골드
+  splat(0.62, 0.42, -50, 30, inkColor(1, 0.6), 2.8);     // 시안
+  splat(0.5, 0.52, 15, 42, inkColor(2, 0.5), 2.2);       // 바이올렛
+}
+seedInitialInk();
+
+/* ══ 11. 메인 루프 (또는 reduced-motion 정적 렌더) ══════════════ */
+if (reducedMotion) {
+  // 모션 최소화 설정: 시뮬레이션을 몇 스텝만 미리 돌려
+  // 은은하게 번진 정적 프레임 하나만 그리고 끝. 애니메이션 루프 없음.
+  for (let i = 0; i < 60; i++) step(1 / 60);
+  render();
+  // 리사이즈 시에도 정적 프레임만 다시 그린다
+  window.addEventListener('resize', () => {
+    if (resizeCanvas()) { initFramebuffers(); }
+    render();
+  });
+} else {
+  let lastTime = performance.now();
+  let lastRafTime = performance.now();
+
+  function update(now) {
+    // dt 계산 (탭 비활성 등 큰 간격은 클램프)
+    let dt = (now - lastTime) / 1000;
+    dt = Math.min(dt, 1 / 60 * 2);
+    if (dt <= 0) dt = 1 / 60;
+    lastTime = now;
+
+    if (resizeCanvas()) initFramebuffers();
+
+    applyPointerInput();
+    maybeIdleBehavior(now, now / 1000, dt);
+    step(dt);
+    render();
+  }
+
+  function frame(now) {
+    lastRafTime = now;
+    update(now);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // rAF 워치독: 헤드리스(가상시간)나 숨겨진 탭처럼 rAF가 멈춘 환경에서도
+  // setTimeout으로 시뮬레이션을 계속 구동한다. rAF가 살아 있으면 아무 것도 안 함.
+  (function watchdog() {
+    setTimeout(() => {
+      const now = performance.now();
+      if (now - lastRafTime > 100) update(now);
+      watchdog();
+    }, 16);
+  })();
+}
+
+})();
 </script>
+</body>
+</html>
