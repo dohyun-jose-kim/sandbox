@@ -1,70 +1,652 @@
-<!doctype html>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Build · sandbox — dohyun-jose-kim</title>
-<meta name="description" content="Build — a sandbox section under construction.">
+<meta name="description" content="Animated landing page study — split-text intro orchestration, scroll reveals, count-ups, marquee. Pure HTML/CSS/JS, zero libraries." />
+<!--
+  ═══════════════════════════════════════════════════════════════════
+  02_animated-landing.html — Lumio 랜딩 기법 학습용 프로토타입
+  ═══════════════════════════════════════════════════════════════════
+  원본: alexprokhorov의 "Lumio" 바이럴 랜딩 (Claude 생성, 순수 HTML/CSS/JS, 라이브러리 0개)
+
+  재현한 6가지 기법:
+    [1] 오케스트레이션 인트로 — setTimeout 체이닝 + CSS 클래스 토글
+        (센터 로고 등장→퇴장 → 네비 슬라이드 → 링크 55ms 스태거
+         → pill → H1 → 서브라인 → 버튼 → 스크롤 인디케이터 → 카운트업)
+    [2] 글자 단위 split text — JS가 텍스트를 <span class="ch" style="--i:n">로
+        분해, CSS가 animation-delay: calc(var(--i) * 11ms)로 스태거
+    [3] 다수의 CSS @keyframes — introLetterUp, pillBorderGlow,
+        pillShimmerTop/Bottom, navLineIn, scrollDownDot 등
+    [4] ⚠ 원본의 wheel 하이재킹(풀페이지 스냅)은 재현하지 않음 —
+        자연 스크롤 + IntersectionObserver 섹션 리빌로 대체 (블로그 UX 결론)
+    [5] rAF 카운트업, easeOutBack 팝인(카드), 호버 시 감속하는 무한 마퀴
+    [6] 다크 미니멀 토큰 — bg #0d0d10 / ink #e8e6e1 / muted #8a8894 /
+        골드 악센트 #c9a86a, 시스템 폰트만(웹폰트 CDN 없음, 완전 오프라인),
+        글래스모피즘 네비(backdrop-filter), 애니메이션 보더 글로우 pill
+
+  접근성: prefers-reduced-motion 시 인트로 전부 생략, 정적 표시.
+  ═══════════════════════════════════════════════════════════════════
+-->
 <style>
-  :root{
-    --sky-0:#ff4d2e; --sky-1:#ff7a3d; --sky-2:#ffa969; --sky-3:#ffd2a0;
-    --sun:#fff1cf;
-    --sand-top:#ffe1a6; --sand-2:#f6c476; --sand-3:#e2a458; --sand-sh:#c5853f;
-    --pink:#ff3d8b; --cream:#fff4e8; --ink:#5d2a14; --muted:#b06a2e;
-    --font:"SF Pro Rounded", ui-rounded, "Quicksand", "Hiragino Maru Gothic Pro", system-ui, -apple-system, sans-serif;
+  /* ── [6] 디자인 토큰: 다크 미니멀 ─────────────────────────────── */
+  :root {
+    --bg:      #0d0d10;   /* 배경 */
+    --bg-soft: #131318;   /* 카드 배경 */
+    --ink:     #e8e6e1;   /* 본문 잉크 */
+    --muted:   #8a8894;   /* 보조 회색 */
+    --accent:  #c9a86a;   /* 절제된 골드 악센트 (단 하나만) */
+    --line:    rgba(232, 230, 225, 0.10);  /* 헤어라인 */
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 "Apple SD Gothic Neo", "Malgun Gothic", Roboto,
+                 "Helvetica Neue", Arial, sans-serif; /* 시스템 스택만 — 오프라인 */
+    --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1); /* [5] easeOutBack */
   }
-  .night{
-    --sky-0:#10162e; --sky-1:#1d2547; --sky-2:#2c3460; --sky-3:#46406e;
-    --sun:#cdd6ff;
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    line-height: 1.6;
   }
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%}
-  body{
-    font-family:var(--font);
-    background:linear-gradient(180deg,var(--sky-0) 0%,var(--sky-1) 34%,var(--sky-2) 62%,var(--sky-3) 100%);
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    min-height:100vh; overflow:hidden; text-align:center; color:var(--cream);
-    transition:background .5s;
+  a { color: inherit; text-decoration: none; }
+  ::selection { background: var(--accent); color: var(--bg); }
+
+  /* ═══ [1] 오케스트레이션 — 시퀀스 요소의 숨김/등장 상태 ═══════════
+     JS가 로드되고(html.js) 모션 허용일 때만 숨김 상태를 적용.
+     JS 실패 / reduced-motion 이면 전부 그대로 보인다(안전장치).     */
+  html.js:not(.reduced) .seq {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.7s ease, transform 0.7s var(--ease-out-back);
   }
-  .glow{
-    position:fixed; left:50%; top:26%; width:min(60vmin,420px); height:min(60vmin,420px);
-    transform:translate(-50%,-50%); border-radius:50%;
-    background:radial-gradient(circle, var(--sun) 0%, transparent 62%);
-    opacity:.85; pointer-events:none;
+  html.js:not(.reduced) .seq.on {
+    opacity: 1;
+    transform: translateY(0);
   }
-  main{position:relative; padding:24px}
-  .emoji{font-size:clamp(64px,16vmin,120px); line-height:1; display:block; animation:bob 3.2s ease-in-out infinite}
-  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-  h1{
-    margin:18px 0 8px; font-size:clamp(38px,9vmin,72px); font-weight:800; letter-spacing:.06em;
-    text-transform:uppercase; text-shadow:0 3px 0 rgba(93,42,20,.25);
+
+  /* ── 인트로 오버레이: 센터 로고 등장 → 퇴장 ──────────────────── */
+  #intro {
+    position: fixed; inset: 0; z-index: 100;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
   }
-  .msg{margin:0; font-size:clamp(14px,2.6vmin,18px); font-weight:700; opacity:.95}
-  .msg small{display:block; margin-top:6px; font-weight:600; opacity:.85}
-  .back{
-    display:inline-block; margin-top:34px; padding:12px 22px; border-radius:999px;
-    background:var(--cream); color:var(--ink); font-weight:800; font-size:15px;
-    text-decoration:none; box-shadow:0 4px 0 rgba(93,42,20,.28);
-    transition:transform .15s;
+  html:not(.js) #intro, html.reduced #intro { display: none; } /* 모션 미허용 시 오버레이 자체를 제거 */
+  #intro.exit { animation: introOverlayOut 0.6s ease forwards; }
+  #intro.gone { display: none; }
+
+  .intro-logo {
+    font-size: clamp(2rem, 6vw, 3.6rem);
+    font-weight: 200;
+    letter-spacing: 0.45em;
+    text-indent: 0.45em; /* letter-spacing 시각 보정 */
+    display: flex;
   }
-  .back:hover{transform:translateY(-2px)}
-  .sand{
-    position:fixed; left:50%; bottom:-14vmin; width:150vmax; height:26vmin; min-height:150px;
-    transform:translateX(-50%); border-radius:50% 50% 0 0 / 100% 100% 0 0;
-    background:linear-gradient(180deg,var(--sand-top),var(--sand-2) 55%,var(--sand-3));
-    box-shadow:inset 0 10px 24px rgba(197,133,63,.35);
+  /* [2]+[3] 로고 글자들이 아래서 위로 스태거 등장 */
+  .intro-logo .ch {
+    display: inline-block;
+    opacity: 0;
+    animation: introLetterUp 0.7s var(--ease-out-back) forwards;
+    animation-delay: calc(var(--i) * 70ms + 200ms);
   }
-  @media (prefers-reduced-motion: reduce){ .emoji{animation:none} }
+  #intro.exit .intro-logo { animation: introLogoOut 0.55s ease-in forwards; }
+
+  @keyframes introLetterUp {
+    from { opacity: 0; transform: translateY(0.9em) rotate(4deg); }
+    to   { opacity: 1; transform: translateY(0)      rotate(0); }
+  }
+  @keyframes introLogoOut {
+    to { opacity: 0; transform: translateY(-1.2em) scale(0.92); filter: blur(6px); }
+  }
+  @keyframes introOverlayOut {
+    to { opacity: 0; visibility: hidden; }
+  }
+
+  /* ═══ [6] 글래스모피즘 상단 네비 ═══════════════════════════════ */
+  .nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1rem clamp(1.2rem, 4vw, 3rem);
+    background: rgba(13, 13, 16, 0.55);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+  html.js:not(.reduced) .nav {
+    transform: translateY(-110%);
+    transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  html.js:not(.reduced) .nav.show { transform: translateY(0); }
+
+  /* [3] navLineIn — 네비 하단 헤어라인이 좌→우로 그어짐 */
+  .nav::after {
+    content: "";
+    position: absolute; left: 0; bottom: -1px; height: 1px; width: 100%;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    transform: scaleX(0);
+    opacity: 0.6;
+  }
+  html.js:not(.reduced) .nav.show::after { animation: navLineIn 1.2s ease 0.3s forwards; }
+  @keyframes navLineIn { to { transform: scaleX(1); } }
+
+  .nav-logo { font-weight: 600; letter-spacing: 0.28em; font-size: 0.85rem; }
+  .nav-logo em { color: var(--accent); font-style: normal; }
+
+  .nav-links { display: flex; gap: clamp(0.8rem, 2.5vw, 2rem); list-style: none; }
+  .nav-links a {
+    font-size: 0.8rem; color: var(--muted);
+    letter-spacing: 0.08em;
+    transition: color 0.25s ease;
+  }
+  .nav-links a:hover { color: var(--ink); }
+  /* [1] 네비 링크 55ms 스태거 — .show 이후 transition-delay 로 순차 등장 */
+  html.js:not(.reduced) .nav-links li {
+    opacity: 0; transform: translateY(-10px);
+    transition: opacity 0.5s ease, transform 0.5s var(--ease-out-back);
+    transition-delay: calc(var(--i) * 55ms + 250ms);
+  }
+  html.js:not(.reduced) .nav.show .nav-links li { opacity: 1; transform: translateY(0); }
+
+  /* ═══ HERO 섹션 ═══════════════════════════════════════════════ */
+  .hero {
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+    padding: 6rem 1.5rem 4rem;
+    position: relative;
+  }
+  /* 은은한 배경 광원 (골드, 아주 절제) */
+  .hero::before {
+    content: "";
+    position: absolute; top: -20%; left: 50%; transform: translateX(-50%);
+    width: 70vw; height: 60vh;
+    background: radial-gradient(ellipse at center,
+                rgba(201, 168, 106, 0.07), transparent 65%);
+    pointer-events: none;
+  }
+
+  /* ── [3]+[6] pill: 애니메이션 보더 글로우 + 상/하 시머 라인 ────── */
+  .pill {
+    position: relative;
+    display: inline-flex; align-items: center; gap: 0.5em;
+    padding: 0.45em 1.2em;
+    border-radius: 999px;
+    font-size: 0.78rem; letter-spacing: 0.14em;
+    color: var(--muted);
+    border: 1px solid rgba(201, 168, 106, 0.35);
+    background: rgba(201, 168, 106, 0.05);
+    overflow: hidden;
+    animation: pillBorderGlow 3s ease-in-out infinite; /* 은은한 골드 글로우 맥동 */
+  }
+  .pill .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    animation: pillDotPulse 2s ease-in-out infinite;
+  }
+  /* 상단/하단 가장자리를 훑고 지나가는 빛 줄기 (다크 배경에서 특히 효과적) */
+  .pill::before, .pill::after {
+    content: "";
+    position: absolute; height: 1px; width: 45%;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  }
+  .pill::before { top: 0;    left: -50%; animation: pillShimmerTop    3.2s linear infinite; }
+  .pill::after  { bottom: 0; right: -50%; animation: pillShimmerBottom 3.2s linear infinite; }
+
+  @keyframes pillBorderGlow {
+    0%, 100% { box-shadow: 0 0 8px  rgba(201, 168, 106, 0.10); }
+    50%      { box-shadow: 0 0 22px rgba(201, 168, 106, 0.28); }
+  }
+  @keyframes pillShimmerTop    { to { left: 105%; } }
+  @keyframes pillShimmerBottom { to { right: 105%; } }
+  @keyframes pillDotPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  /* ── [2] H1 split text — 글자별 11ms 스태거 ───────────────────── */
+  h1.hero-title {
+    margin-top: 1.6rem;
+    font-size: clamp(2.2rem, 7vw, 5rem);
+    font-weight: 250;
+    letter-spacing: 0.02em;
+    line-height: 1.15;
+  }
+  .hero-title .word { display: inline-block; white-space: nowrap; } /* 단어 중간 줄바꿈 방지 */
+  .hero-title .ch { display: inline-block; }
+  html.js:not(.reduced) .hero-title .ch { opacity: 0; }
+  html.js:not(.reduced) .hero-title.play .ch {
+    animation: chUp 0.7s var(--ease-out-back) forwards;
+    animation-delay: calc(var(--i) * 11ms);  /* ← 원본 기법 그대로: 11ms/글자 */
+  }
+  @keyframes chUp {
+    from { opacity: 0; transform: translateY(0.55em); filter: blur(4px); }
+    to   { opacity: 1; transform: translateY(0);      filter: blur(0); }
+  }
+  .hero-title .accent { color: var(--accent); }
+
+  .hero-sub {
+    margin-top: 1.4rem;
+    max-width: 34em;
+    color: var(--muted);
+    font-size: clamp(0.95rem, 1.6vw, 1.1rem);
+    font-weight: 300;
+  }
+
+  /* ── CTA 버튼 ─────────────────────────────────────────────────── */
+  .hero-cta { margin-top: 2.2rem; display: flex; gap: 0.9rem; flex-wrap: wrap; justify-content: center; }
+  .btn {
+    display: inline-block;
+    padding: 0.75em 1.9em;
+    border-radius: 999px;
+    font-size: 0.85rem; letter-spacing: 0.1em;
+    border: 1px solid var(--line);
+    transition: transform 0.25s var(--ease-out-back),
+                background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+  }
+  .btn:hover { transform: translateY(-3px); }
+  .btn-primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn-primary:hover { background: var(--accent); border-color: var(--accent); }
+  .btn-ghost { color: var(--muted); }
+  .btn-ghost:hover { color: var(--ink); border-color: var(--muted); }
+
+  /* ── [3] scrollDown 인디케이터 ────────────────────────────────── */
+  .scroll-down {
+    /* 주의: .seq 가 transform 을 트랜지션하므로 translateX(-50%) 센터링은
+       못 쓴다(덮어써짐) → left/right 0 스트레치 + 내부 flex 센터링 */
+    position: absolute; bottom: 2.2rem; left: 0; right: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+    color: var(--muted); font-size: 0.65rem; letter-spacing: 0.3em;
+  }
+  .scroll-down .mouse {
+    width: 22px; height: 34px;
+    border: 1px solid var(--muted); border-radius: 11px;
+    position: relative;
+  }
+  .scroll-down .mouse::after {
+    content: "";
+    position: absolute; top: 6px; left: 50%; margin-left: -1.5px;
+    width: 3px; height: 6px; border-radius: 2px;
+    background: var(--accent);
+    animation: scrollDownDot 1.8s ease-in-out infinite;
+  }
+  @keyframes scrollDownDot {
+    0%   { transform: translateY(0);    opacity: 1; }
+    70%  { transform: translateY(12px); opacity: 0; }
+    100% { transform: translateY(0);    opacity: 0; }
+  }
+
+  /* ═══ [4] 섹션 리빌 — IntersectionObserver 가 .in 토글 ═════════
+     (wheel 하이재킹 없음. 자연 스크롤 유지.)                        */
+  html.js:not(.reduced) .reveal {
+    opacity: 0; transform: translateY(30px);
+    transition: opacity 0.8s ease, transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  html.js:not(.reduced) .reveal.in { opacity: 1; transform: translateY(0); }
+
+  /* ═══ FEATURES 섹션: 카드 3장 팝인 + 카운트업 ═══════════════════ */
+  .features {
+    padding: 7rem clamp(1.2rem, 5vw, 4rem);
+    max-width: 1100px; margin: 0 auto;
+  }
+  .sec-label {
+    color: var(--accent); font-size: 0.72rem;
+    letter-spacing: 0.35em; text-transform: uppercase;
+  }
+  .sec-title {
+    margin-top: 0.8rem;
+    font-size: clamp(1.5rem, 3.5vw, 2.3rem);
+    font-weight: 300;
+  }
+  .cards {
+    margin-top: 3rem;
+    display: grid; gap: 1.2rem;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+  .card {
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 2rem 1.7rem;
+    transition: border-color 0.3s ease, transform 0.3s var(--ease-out-back);
+  }
+  .card:hover { border-color: rgba(201, 168, 106, 0.4); transform: translateY(-4px); }
+  /* [5] easeOutBack 팝인 — 카드별 120ms 스태거 (컨테이너 .in 시) */
+  html.js:not(.reduced) .card {
+    opacity: 0; transform: translateY(24px) scale(0.94);
+    transition: opacity 0.6s ease, transform 0.6s var(--ease-out-back);
+    transition-delay: calc(var(--i) * 120ms);
+  }
+  html.js:not(.reduced) .cards.in .card { opacity: 1; transform: translateY(0) scale(1); }
+
+  .card .num {
+    font-size: 2.6rem; font-weight: 200;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums; /* 카운트업 시 폭 흔들림 방지 */
+  }
+  .card .num small { font-size: 1.2rem; color: var(--accent); margin-left: 2px; }
+  .card h3 { margin-top: 0.4rem; font-size: 1rem; font-weight: 500; }
+  .card p  { margin-top: 0.5rem; font-size: 0.85rem; color: var(--muted); }
+
+  /* ═══ FOOTER 섹션: 무한 마퀴 (호버 시 감속) ═════════════════════ */
+  .footer-sec {
+    padding: 6rem 0 3rem;
+    border-top: 1px solid var(--line);
+    overflow: hidden;
+    text-align: center;
+  }
+  .marquee {
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+    cursor: default;
+  }
+  /* transform 은 inner 에만 — 바깥 mask(양끝 페이드)는 고정 유지 */
+  .marquee-inner { display: flex; white-space: nowrap; will-change: transform; width: max-content; }
+  .marquee-track { display: flex; flex-shrink: 0; }
+  .marquee .kw {
+    display: inline-flex; align-items: center;
+    font-size: clamp(1.3rem, 3vw, 2rem);
+    font-weight: 200; letter-spacing: 0.06em;
+    color: var(--muted);
+    padding: 0 1.4rem;
+    transition: color 0.3s ease;
+  }
+  .marquee .kw:hover { color: var(--accent); }
+  .marquee .kw::after {
+    content: "·"; color: var(--accent);
+    margin-left: 2.8rem; opacity: 0.5;
+  }
+  .footer-note {
+    margin-top: 4rem;
+    color: var(--muted); font-size: 0.75rem; letter-spacing: 0.12em;
+  }
+  .footer-note em { color: var(--accent); font-style: normal; }
+
+  /* ═══ 검증용 settle 모드 (?vt=NNN) ═════════════════════════════
+     헤드리스 Chrome의 --virtual-time-budget 은 타이머/rAF만 가속하고
+     컴포지터의 CSS 애니메이션 시계는 실시간이라 캡처 상태가 비결정적.
+     → ?vt=800 처럼 열면 JS가 타임라인을 해당 시점으로 점프시키고,
+       아래 규칙이 모든 애니메이션/트랜지션을 즉시 종료 상태로 고정해
+       결정적 스크린샷을 얻는다. (실사용에는 영향 없음)               */
+  html.settle *, html.settle *::before, html.settle *::after {
+    animation-duration: 0.001s !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
+  /* +?compact=1 → hero 100vh 해제: tall 뷰포트에서 전 섹션 동시 교차 */
+  html.compact .hero { min-height: auto; padding-bottom: 8rem; }
+
+  /* ═══ 접근성: prefers-reduced-motion → 전부 정적 ═══════════════ */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+    html { scroll-behavior: auto; }
+  }
+
+  /* 모바일 미세 조정 */
+  @media (max-width: 480px) {
+    .nav-links { gap: 0.7rem; }
+    .nav-links a { font-size: 0.72rem; }
+    .scroll-down { bottom: 1.4rem; }
+  }
 </style>
-<div class="glow"></div>
-<div class="sand"></div>
-<main>
-  <span class="emoji" aria-hidden="true">🪣</span>
-  <h1>Build</h1>
-  <p class="msg">under construction — still building this sandcastle
-    <small>아직 모래성을 쌓는 중이에요</small>
-  </p>
-  <a class="back" href="../">← back to the sandbox</a>
-</main>
+</head>
+<body>
+
+  <!-- ═══ [1] 인트로 오버레이: 센터 로고 등장 → 퇴장 ═══ -->
+  <div id="intro" aria-hidden="true">
+    <div class="intro-logo" data-split>DOHYUN</div>
+  </div>
+
+  <!-- ═══ [6] 글래스 네비 ═══ -->
+  <header class="nav" id="nav">
+    <a class="nav-logo" href="#">DH<em>.</em></a>
+    <ul class="nav-links">
+      <li style="--i:0"><a href="#">Home</a></li>
+      <li style="--i:1"><a href="#features">Research</a></li>
+      <li style="--i:2"><a href="#features">Code</a></li>
+      <li style="--i:3"><a href="#features">Notes</a></li>
+      <li style="--i:4"><a href="#footer">About</a></li>
+      <li style="--i:5"><a href="../">sandbox ↩</a></li>
+    </ul>
+  </header>
+
+  <main>
+    <!-- ═══ HERO ═══ -->
+    <section class="hero">
+      <div class="pill seq" id="seq-pill">
+        <span class="dot"></span> 2026 · 개인 리서치 블로그
+      </div>
+
+      <!-- [2] split 대상: data-split 마킹. accent 색은 span 유지 -->
+      <h1 class="hero-title" id="hero-title">
+        <span data-split>DOHYUN</span><br />
+        <span class="accent" data-split>Research · Code · Notes</span>
+      </h1>
+
+      <p class="hero-sub seq" id="seq-sub">
+        어서 오세요. 실험과 기록 사이 어딘가 —<br />
+        읽고, 만들고, 부수고, 다시 적는 개인 연구 노트입니다.
+      </p>
+
+      <div class="hero-cta seq" id="seq-cta">
+        <a class="btn btn-primary" href="#features">글 둘러보기</a>
+        <a class="btn btn-ghost" href="#footer">소개 보기</a>
+      </div>
+
+      <div class="scroll-down seq" id="seq-scroll" aria-hidden="true">
+        <div class="mouse"></div>
+        <span>SCROLL</span>
+      </div>
+    </section>
+
+    <!-- ═══ FEATURES: 팝인 카드 + rAF 카운트업 ═══ -->
+    <section class="features" id="features">
+      <div class="reveal">
+        <div class="sec-label">Highlights</div>
+        <h2 class="sec-title">숫자로 보는 기록</h2>
+      </div>
+
+      <div class="cards reveal" id="cards">
+        <div class="card" style="--i:0">
+          <div class="num"><span data-count="128">0</span><small>+</small></div>
+          <h3>작성한 노트</h3>
+          <p>리서치 메모부터 빌드 로그까지, 꾸준히 쌓인 기록.</p>
+        </div>
+        <div class="card" style="--i:1">
+          <div class="num"><span data-count="24">0</span><small>개</small></div>
+          <h3>사이드 프로젝트</h3>
+          <p>웹 실험, 시각화, 도구 — 만들며 배운 것들.</p>
+        </div>
+        <div class="card" style="--i:2">
+          <div class="num"><span data-count="1642">0</span><small>회</small></div>
+          <h3>커밋</h3>
+          <p>작은 개선의 누적. 버전은 계속 올라간다.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ FOOTER: 감속 마퀴 ═══ -->
+    <section class="footer-sec reveal" id="footer">
+      <!-- [5] 무한 마퀴: 트랙 2개를 이어붙여 루프. rAF로 이동, 호버 시 속도 lerp 감속 -->
+      <div class="marquee" aria-hidden="true">
+        <div class="marquee-inner" id="marquee">
+        <div class="marquee-track">
+          <span class="kw">React</span><span class="kw">Vite</span><span class="kw">TypeScript</span><span class="kw">WebGL</span><span class="kw">Three.js</span><span class="kw">Node.js</span><span class="kw">Python</span><span class="kw">D3.js</span><span class="kw">CSS</span><span class="kw">LLM</span>
+        </div>
+        <!-- 동일 내용 복제 (이음새 없는 루프용) -->
+        <div class="marquee-track" aria-hidden="true">
+          <span class="kw">React</span><span class="kw">Vite</span><span class="kw">TypeScript</span><span class="kw">WebGL</span><span class="kw">Three.js</span><span class="kw">Node.js</span><span class="kw">Python</span><span class="kw">D3.js</span><span class="kw">CSS</span><span class="kw">LLM</span>
+        </div>
+        </div>
+      </div>
+
+      <p class="footer-note">© 2026 DOHYUN <em>·</em> Lumio 기법 재현 프로토타입 <em>·</em> 라이브러리 0개</p>
+    </section>
+  </main>
+
 <script>
-  // follow the landing's day/night choice (same localStorage key)
-  try{ if(localStorage.getItem('sb-theme')==='night') document.documentElement.classList.add('night'); }catch(e){}
+(function () {
+  "use strict";
+
+  var docEl = document.documentElement;
+  docEl.classList.add("js"); // JS 동작 확인 → 숨김 상태 활성화 (JS 실패 시 전부 보임)
+
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduced) docEl.classList.add("reduced"); // 인트로/모션 전부 생략
+
+  /* 검증용 훅: ?vt=800 → 타임라인을 800ms 시점으로 점프 + settle 고정.
+     (헤드리스 스크린샷 검증 전용 — 일반 접속 시엔 완전히 비활성)      */
+  var params = new URLSearchParams(location.search);
+  var vtParam = params.get("vt");
+  var settle = vtParam !== null;
+  if (settle) docEl.classList.add("settle");
+  var instant = reduced || settle; // 카운터 등 즉시 최종값 모드
+
+  /* 검증용: ?compact=1 → hero 의 min-height:100vh 를 풀어
+     tall 뷰포트(예: 1280x3000)에서 모든 섹션이 스크롤 없이 교차
+     → IO 리빌·카운트업 발화를 한 장으로 검증. (프로그램 스크롤은
+     헤드리스 가상시간에서 고정 레이어가 깨져서 쓰지 않음)           */
+  if (settle && params.get("compact")) docEl.classList.add("compact");
+
+  /* ═══ [2] 글자 단위 split text ════════════════════════════════
+     data-split 요소의 텍스트를 단어(.word) → 글자(<span class="ch" style="--i:n">)
+     로 분해. --i 는 요소 내 전역 인덱스 → CSS 가 11ms 씩 지연.       */
+  function splitText(el) {
+    var text = el.textContent;
+    el.textContent = "";
+    var i = 0;
+    text.split(" ").forEach(function (word, w, arr) {
+      var wordSpan = document.createElement("span");
+      wordSpan.className = "word";
+      word.split("").forEach(function (chChar) {
+        var ch = document.createElement("span");
+        ch.className = "ch";
+        ch.style.setProperty("--i", i++);
+        ch.textContent = chChar;
+        wordSpan.appendChild(ch);
+      });
+      el.appendChild(wordSpan);
+      if (w < arr.length - 1) el.appendChild(document.createTextNode(" "));
+    });
+  }
+  document.querySelectorAll("[data-split]").forEach(splitText);
+
+  /* ═══ [5] rAF 카운트업 (easeOutCubic) ═════════════════════════ */
+  function countUp(el, duration) {
+    var target = parseInt(el.getAttribute("data-count"), 10);
+    if (instant) { el.textContent = target.toLocaleString(); return; }
+    var start = null;
+    function frame(ts) {
+      if (start === null) start = ts;
+      var p = Math.min((ts - start) / duration, 1);
+      var eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
+      el.textContent = Math.round(target * eased).toLocaleString();
+      if (p < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+  var counted = false;
+  function runCounters() {
+    if (counted) return;
+    counted = true;
+    document.querySelectorAll("[data-count]").forEach(function (el) {
+      countUp(el, 1400);
+    });
+  }
+
+  /* ═══ [1] 오케스트레이션: setTimeout 체이닝 + 클래스 토글 ══════
+     타임라인(ms):
+       0     인트로 로고 글자 스태거 등장 (CSS 자동)
+       1150  로고 퇴장 (introLogoOut + 오버레이 페이드)
+       1750  오버레이 제거 / 네비 슬라이드 인 (+링크 55ms 스태거는 CSS)
+       2150  pill 등장
+       2500  H1 split-text 재생 (글자당 11ms)
+       3150  서브라인
+       3450  CTA 버튼
+       3750  스크롤 인디케이터                                       */
+  var intro = document.getElementById("intro");
+
+  function on(id) { document.getElementById(id).classList.add("on"); }
+
+  /* 타임라인을 데이터로 정의 — 일반 모드에선 setTimeout 체이닝,
+     검증(settle) 모드에선 vt 시점까지의 스텝만 즉시 실행           */
+  var TIMELINE = [
+    [1150, function () { intro.classList.add("exit"); }],
+    [1750, function () {
+      intro.classList.add("gone");
+      document.getElementById("nav").classList.add("show");
+    }],
+    [2150, function () { on("seq-pill"); }],
+    [2500, function () { document.getElementById("hero-title").classList.add("play"); }],
+    [3150, function () { on("seq-sub"); }],
+    [3450, function () { on("seq-cta"); }],
+    [3750, function () { on("seq-scroll"); }]
+  ];
+
+  if (reduced) {
+    // 모션 미허용: 인트로 생략(오버레이는 CSS가 숨김), 전부 즉시 표시
+    TIMELINE.forEach(function (step) { step[1](); });
+    runCounters();
+  } else if (settle) {
+    // 검증 모드: vt 시점 상태로 점프 (애니메이션은 CSS settle 규칙이 종료 고정)
+    var vt = parseInt(vtParam, 10) || 0;
+    TIMELINE.forEach(function (step) { if (step[0] <= vt) step[1](); });
+  } else {
+    // ═══ [1] 실제 오케스트레이션: setTimeout 체이닝 + 클래스 토글 ═══
+    TIMELINE.forEach(function (step) { setTimeout(step[1], step[0]); });
+  }
+
+  /* ═══ [4] IntersectionObserver 섹션 리빌 ══════════════════════
+     자연 스크롤 유지 (wheel 하이재킹 없음).
+     observe 시점에 이미 교차 중이면 IO 콜백이 즉시 1회 실행되므로
+     로드 시 화면 안에 있는 섹션도 정상적으로 리빌된다.              */
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add("in");
+      if (entry.target.id === "cards") runCounters(); // 카드 보이면 카운트업 발사
+      io.unobserve(entry.target);
+    });
+  }, { threshold: 0.15 });
+  document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
+
+  /* ═══ [5] 무한 마퀴 — rAF 이동, 호버 시 속도 lerp 감속 ═════════ */
+  var marquee = document.getElementById("marquee");
+  var track = marquee.querySelector(".marquee-track");
+  var x = 0;
+  var speed = 0;              // 현재 속도 (px/frame 기준값, dt 보정)
+  var BASE = 60;              // 평상시 속도 (px/s)
+  var SLOW = 12;              // 호버 시 속도 (px/s) — 감속하되 완전히 멈추진 않음
+  var target = BASE;
+  marquee.addEventListener("mouseenter", function () { target = SLOW; });
+  marquee.addEventListener("mouseleave", function () { target = BASE; });
+
+  if (!reduced) {
+    var last = null;
+    (function tick(ts) {
+      if (last === null) last = ts;
+      var dt = Math.min((ts - last) / 1000, 0.05); // 탭 복귀 시 점프 방지
+      last = ts;
+      speed += (target - speed) * 0.06;  // lerp → 부드러운 감속/가속
+      x -= speed * dt;
+      var w = track.offsetWidth;         // 트랙 1개 폭만큼 지나면 리셋 (이음새 없음)
+      if (w > 0 && -x >= w) x += w;
+      marquee.style.transform = "translateX(" + x + "px)";
+      requestAnimationFrame(tick);
+    })(performance.now());
+  }
+})();
 </script>
+</body>
+</html>
