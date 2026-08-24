@@ -1,70 +1,562 @@
-<!doctype html>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Phone · sandbox — dohyun-jose-kim</title>
-<meta name="description" content="Phone — a sandbox section under construction.">
+<meta name="description" content="visitor probe — what a browser tells about its visitor, measured.">
+<meta name="robots" content="noindex">
 <style>
-  :root{
-    --sky-0:#ff4d2e; --sky-1:#ff7a3d; --sky-2:#ffa969; --sky-3:#ffd2a0;
-    --sun:#fff1cf;
-    --sand-top:#ffe1a6; --sand-2:#f6c476; --sand-3:#e2a458; --sand-sh:#c5853f;
-    --pink:#ff3d8b; --cream:#fff4e8; --ink:#5d2a14; --muted:#b06a2e;
-    --font:"SF Pro Rounded", ui-rounded, "Quicksand", "Hiragino Maru Gothic Pro", system-ui, -apple-system, sans-serif;
+  /* ── 다크 미니멀 — bksh-plant 패턴 재사용 ────────────────────────
+     단, 프로브는 표가 길어 스크롤이 필요하므로 overflow:hidden 은 쓰지 않는다
+     (다른 leaf 와 의도적으로 다른 지점).                              */
+  html, body {
+    margin: 0; padding: 0;
+    background: #0d0d10;
+    color: #c9c9cf;
+    font-family: -apple-system, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", sans-serif;
   }
-  .night{
-    --sky-0:#10162e; --sky-1:#1d2547; --sky-2:#2c3460; --sky-3:#46406e;
-    --sun:#cdd6ff;
+  body { padding: 28px 32px 80px; }
+
+  #ui h1 {
+    margin: 0 0 6px;
+    font-size: 15px; font-weight: 500; letter-spacing: 0.04em;
+    color: #e8e8ec;
   }
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%}
-  body{
-    font-family:var(--font);
-    background:linear-gradient(180deg,var(--sky-0) 0%,var(--sky-1) 34%,var(--sky-2) 62%,var(--sky-3) 100%);
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    min-height:100vh; overflow:hidden; text-align:center; color:var(--cream);
-    transition:background .5s;
+  #ui p { margin: 0; font-size: 12px; color: #6f6f78; letter-spacing: 0.02em; }
+
+  .back {
+    position: fixed; top: 22px; right: 26px; z-index: 10;
+    color: #d8d4c8; text-decoration: none;
+    font-size: 11.5px; letter-spacing: 0.06em; opacity: 0.45;
+    transition: opacity .25s;
+    background: #0d0d10; padding: 4px 8px; border-radius: 4px; /* 스크롤 시 표와 겹침 방지 */
   }
-  .glow{
-    position:fixed; left:50%; top:26%; width:min(60vmin,420px); height:min(60vmin,420px);
-    transform:translate(-50%,-50%); border-radius:50%;
-    background:radial-gradient(circle, var(--sun) 0%, transparent 62%);
-    opacity:.85; pointer-events:none;
+  .back:hover { opacity: 1; }
+
+  /* ── secure context 배지 — 폰 LAN 실측 시 '미지원' 오독 방지 ───── */
+  #ctx {
+    margin: 20px 0 4px; padding: 10px 14px;
+    border-radius: 6px; font-size: 12px; line-height: 1.55;
+    border: 1px solid;
   }
-  main{position:relative; padding:24px}
-  .emoji{font-size:clamp(64px,16vmin,120px); line-height:1; display:block; animation:bob 3.2s ease-in-out infinite}
-  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-  h1{
-    margin:18px 0 8px; font-size:clamp(38px,9vmin,72px); font-weight:800; letter-spacing:.06em;
-    text-transform:uppercase; text-shadow:0 3px 0 rgba(93,42,20,.25);
+  #ctx.secure   { border-color: #26402c; background: #12190f; color: #8fbf95; }
+  #ctx.insecure { border-color: #4a3520; background: #1a1409; color: #d9a95c; }
+  #ctx b { font-weight: 600; }
+  #ctx code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; opacity: .85;
   }
-  .msg{margin:0; font-size:clamp(14px,2.6vmin,18px); font-weight:700; opacity:.95}
-  .msg small{display:block; margin-top:6px; font-weight:600; opacity:.85}
-  .back{
-    display:inline-block; margin-top:34px; padding:12px 22px; border-radius:999px;
-    background:var(--cream); color:var(--ink); font-weight:800; font-size:15px;
-    text-decoration:none; box-shadow:0 4px 0 rgba(93,42,20,.28);
-    transition:transform .15s;
+
+  .legend {
+    margin: 14px 0 22px; font-size: 11px; color: #6f6f78;
+    display: flex; gap: 18px; flex-wrap: wrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
-  .back:hover{transform:translateY(-2px)}
-  .sand{
-    position:fixed; left:50%; bottom:-14vmin; width:150vmax; height:26vmin; min-height:150px;
-    transform:translateX(-50%); border-radius:50% 50% 0 0 / 100% 100% 0 0;
-    background:linear-gradient(180deg,var(--sand-top),var(--sand-2) 55%,var(--sand-3));
-    box-shadow:inset 0 10px 24px rgba(197,133,63,.35);
+
+  /* ── 그룹 카드 ──────────────────────────────────────────────── */
+  #groups {
+    display: grid; gap: 18px;
+    grid-template-columns: repeat(auto-fill, minmax(430px, 1fr));
+    align-items: start;
   }
-  @media (prefers-reduced-motion: reduce){ .emoji{animation:none} }
+  @media (max-width: 520px) { body { padding: 24px 18px 72px; } #groups { grid-template-columns: 1fr; } }
+
+  .g {
+    border: 1px solid #1e1e24; border-radius: 8px;
+    background: #101015; overflow: hidden;
+  }
+  .g > h2 {
+    margin: 0; padding: 11px 14px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.05em;
+    color: #e8e8ec; background: #14141a;
+    border-bottom: 1px solid #1e1e24;
+    display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+  }
+  .g > h2 .n { font-size: 10.5px; font-weight: 400; color: #6f6f78; letter-spacing: 0.02em; text-align: right; }
+  .g.leak > h2 { background: #1f1409; color: #e0a35c; border-bottom-color: #382512; }
+  .g.leak > h2 .n { color: #b57a3a; }
+
+  table { width: 100%; border-collapse: collapse; }
+  td {
+    padding: 7px 12px; vertical-align: top;
+    font-size: 11.5px; line-height: 1.5;
+    border-top: 1px solid #17171d;
+  }
+  tr:first-child td { border-top: none; }
+  td.k {
+    width: 38%; color: #8a8a95;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-word;
+  }
+  td.k .sec { color: #55555e; font-size: 9.5px; letter-spacing: .04em; }
+  td.v {
+    color: #d6d6dc;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-word;
+  }
+  td.v .m { display: inline-block; width: 1em; margin-right: 6px; }
+  .ok   .m { color: #6fbf7c; }
+  .na   { color: #55555e; } .na .m { color: #55555e; }
+  .warn { color: #d9a95c; } .warn .m { color: #d9a95c; }
+  .pend { color: #55555e; }
+
+  /* ── 하단 바 ────────────────────────────────────────────────── */
+  #bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 9;
+    padding: 10px 32px;
+    background: rgba(13,13,16,.94); border-top: 1px solid #1e1e24;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    font-size: 11px; color: #6f6f78;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  #bar button {
+    font: inherit; font-size: 11px;
+    color: #d6d6dc; background: #1a1a21;
+    border: 1px solid #2a2a33; border-radius: 5px;
+    padding: 6px 13px; cursor: pointer;
+    transition: background .2s, border-color .2s;
+  }
+  #bar button:hover { background: #22222b; border-color: #3a3a46; }
+  #bar #copied { color: #6fbf7c; opacity: 0; transition: opacity .2s; }
+  @media (max-width: 520px) { #bar { padding: 10px 18px; } }
 </style>
-<div class="glow"></div>
-<div class="sand"></div>
-<main>
-  <span class="emoji" aria-hidden="true">📞</span>
-  <h1>Phone</h1>
-  <p class="msg">under construction — still building this sandcastle
-    <small>아직 모래성을 쌓는 중이에요</small>
-  </p>
-  <a class="back" href="../">← back to the sandbox</a>
-</main>
+</head>
+<body>
+
+<div id="ui">
+  <h1>visitor probe — what this browser tells</h1>
+  <p>수집 가능 범위 실측용 · 그룹 A 외에는 어떤 값도 전송되지 않습니다</p>
+</div>
+
+<a class="back" href="../">← back to the sandbox</a>
+
+<div id="ctx">측정 중…</div>
+
+<div class="legend">
+  <span>● 값 있음</span>
+  <span>○ 미지원</span>
+  <span>⚠ 제약 · 오류</span>
+  <span>sec = secure context 필요</span>
+</div>
+
+<div id="groups"></div>
+
+<div id="bar">
+  <button id="copy">JSON 복사</button>
+  <span id="copied">복사됨</span>
+  <span id="elapsed"></span>
+</div>
+
 <script>
-  // follow the landing's day/night choice (same localStorage key)
-  try{ if(localStorage.getItem('sb-theme')==='night') document.documentElement.classList.add('night'); }catch(e){}
+/* ═══════════════════════════════════════════════════════════════════
+   visitor probe — 브라우저가 방문자에 대해 내어주는 값을 전부 찍는다.
+   목적은 "어느 깊이까지 수집 가능한가"의 실측이며, 이 구성 그대로를
+   라이브에 노출하자는 제안이 아니다. (blog repo issue #41)
+
+   ⚠ 그룹 A(네트워크·위치)만 외부로 요청을 보낸다. 라이브 이식 시
+     'GROUP A 시작' ~ 'GROUP A 끝' 블록을 통째로 삭제할 것.
+   ⚠ Geolocation API 는 호출하지 않는다 (권한 팝업 → 역효과).
+     권한 '상태'만 그룹 F 에서 조회한다.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const SECURE = window.isSecureContext;
+const DUMP = {};                       // JSON 복사용 원본 값
+
+/* ── 값 획득: throw 를 에러 객체로 정규화 + 타임아웃 ──────────────
+   settle 되지 않는 getter(브라우저별로 permissions.query 등이 그렇다)를
+   '…' 상태로 방치하면 '멈춤'과 '미지원'을 구분할 수 없어 실측이 망가진다.
+   반드시 결론을 내도록 8초 레이스를 걸어둔다.                        */
+const TIMEOUT = { __err: '8초 내 응답 없음 (getter 미settle)' };
+async function val(fn) {
+  try {
+    return await Promise.race([
+      Promise.resolve().then(fn),
+      new Promise(r => setTimeout(() => r(TIMEOUT), 8000))
+    ]);
+  } catch (e) { return { __err: String((e && e.message) || e) }; }
+}
+
+/* ── 표시 형식 ──────────────────────────────────────────────────── */
+function fmt(v) {
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
+/* ── 상태 분류: '미지원' / 'secure context 제약' / '빈 값' 을 구분 ─
+   폰을 LAN http 로 실측할 때 secure-context 로 막힌 항목을
+   '이 브라우저 미지원' 으로 오독하는 것을 막는 장치.                */
+function classify(v, sec) {
+  if (v && typeof v === 'object' && v.__err) return { cls: 'warn', m: '⚠', t: v.__err };
+  if (v === undefined || v === null) {
+    return (sec && !SECURE)
+      ? { cls: 'warn', m: '⚠', t: 'secure context 필요 — 미지원인지 구분 불가' }
+      : { cls: 'na', m: '○', t: '미지원' };
+  }
+  if (v === '') return { cls: 'ok', m: '●', t: '(빈 문자열)' };
+  return { cls: 'ok', m: '●', t: fmt(v) };
+}
+
+/* ── 보조 유틸 ──────────────────────────────────────────────────── */
+const mq = q => window.matchMedia(q).matches ? q.replace(/[()]/g, '') : null;
+
+// 폰트 존재 탐지: document.fonts.check() 는 Safari 에서 신뢰할 수 없어
+// monospace 대비 렌더 폭 비교로 측정한다.
+function fontAvailable(name) {
+  const probe = document.createElement('span');
+  probe.style.cssText = 'position:absolute;left:-9999px;top:-9999px;font-size:72px;white-space:nowrap';
+  probe.textContent = 'mmmmmmmmmmlli가나다漢';
+  document.body.appendChild(probe);
+  probe.style.fontFamily = 'monospace';
+  const base = probe.offsetWidth;
+  probe.style.fontFamily = '"' + name + '",monospace';
+  const test = probe.offsetWidth;
+  probe.remove();
+  return test !== base;
+}
+
+function hash32(s) {                    // djb2 — canvas 지문 축약용
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(16);
+}
+
+function nav(k) { return navigator[k]; }
+
+/* ═══ 항목 정의 ════════════════════════════════════════════════════
+   item: [key, getter, {sec:true}]  — sec = secure context 필요       */
+
+const GROUPS = [
+  /* ── GROUP A 시작 — 유일하게 외부로 전송하는 블록 (라이브 이식 시 삭제) ── */
+  {
+    id: 'A', title: 'A · 네트워크 · 위치', leak: true,
+    note: '외부 API 호출 — 실측 전용',
+    items: [
+      ['ipapi.co', async () => {
+        const ac = new AbortController();
+        const t = setTimeout(() => ac.abort(), 6000);
+        try {
+          const r = await fetch('https://ipapi.co/json/', { signal: ac.signal });
+          if (!r.ok) throw new Error('HTTP ' + r.status + (r.status === 429 ? ' (rate limit)' : ''));
+          const j = await r.json();
+          if (j.error) throw new Error(j.reason || 'api error');
+          return {
+            ip: j.ip, city: j.city, region: j.region, country: j.country_name,
+            postal: j.postal, org: j.org, asn: j.asn, tz: j.timezone,
+            latlon: (j.latitude != null ? j.latitude + ',' + j.longitude : undefined)
+          };
+        } finally { clearTimeout(t); }
+      }]
+    ]
+  },
+  /* ── GROUP A 끝 ─────────────────────────────────────────────────── */
+  {
+    id: 'B', title: 'B · UA · 플랫폼',
+    items: [
+      ['userAgent', () => nav('userAgent')],
+      ['uaData.brands', () => nav('userAgentData') && navigator.userAgentData.brands
+        .map(b => b.brand + ' ' + b.version).join(' | ')],
+      ['uaData.mobile', () => nav('userAgentData') && navigator.userAgentData.mobile],
+      ['uaData.platform', () => nav('userAgentData') && navigator.userAgentData.platform],
+      ['uaData.highEntropy', async () => {
+        if (!nav('userAgentData')) return undefined;
+        const h = await navigator.userAgentData.getHighEntropyValues(
+          ['architecture', 'bitness', 'model', 'platformVersion', 'uaFullVersion', 'formFactors']);
+        return {
+          arch: h.architecture, bits: h.bitness, model: h.model || '(없음)',
+          osVer: h.platformVersion, uaFull: h.uaFullVersion, form: h.formFactors
+        };
+      }, { sec: true }],
+      ['platform (deprecated)', () => nav('platform')],
+      ['vendor', () => nav('vendor')],
+      ['maxTouchPoints', () => nav('maxTouchPoints')],
+      ['pdfViewerEnabled', () => nav('pdfViewerEnabled')],
+      ['webdriver (자동화)', () => nav('webdriver')],
+      ['plugins', () => navigator.plugins ? navigator.plugins.length + '개' : undefined]
+    ]
+  },
+  {
+    id: 'C', title: 'C · 화면 · 뷰포트',
+    items: [
+      ['screen', () => screen.width + '×' + screen.height],
+      ['screen.avail', () => screen.availWidth + '×' + screen.availHeight],
+      ['colorDepth / pixelDepth', () => screen.colorDepth + ' / ' + screen.pixelDepth],
+      ['orientation', () => screen.orientation && screen.orientation.type],
+      ['window.inner', () => innerWidth + '×' + innerHeight],
+      ['window.outer', () => outerWidth + '×' + outerHeight],
+      ['devicePixelRatio', () => devicePixelRatio],
+      ['visualViewport.scale', () => window.visualViewport && visualViewport.scale]
+    ]
+  },
+  {
+    id: 'D', title: 'D · 로케일 · 시간',
+    items: [
+      ['language', () => nav('language')],
+      ['languages', () => nav('languages') && navigator.languages.join(', ')],
+      ['Intl.resolvedOptions', () => {
+        const o = Intl.DateTimeFormat().resolvedOptions();
+        return { locale: o.locale, tz: o.timeZone, cal: o.calendar, num: o.numberingSystem };
+      }],
+      ['timezoneOffset', () => (-new Date().getTimezoneOffset() / 60) + 'h (UTC 기준)'],
+      ['현재 시각', () => new Date().toString()],
+      ['방문 기록 (localStorage)', () => {
+        const now = new Date().toISOString().slice(0, 10);
+        const n = Number(localStorage.getItem('probe-visits') || 0) + 1;
+        const first = localStorage.getItem('probe-first') || now;
+        localStorage.setItem('probe-visits', String(n));
+        localStorage.setItem('probe-first', first);
+        return n + '번째 방문 · 첫 방문 ' + first;
+      }]
+    ]
+  },
+  {
+    id: 'E', title: 'E · 하드웨어',
+    items: [
+      ['hardwareConcurrency', () => nav('hardwareConcurrency') && navigator.hardwareConcurrency + ' 코어'],
+      ['deviceMemory', () => nav('deviceMemory') && navigator.deviceMemory + ' GB 이상'],
+      ['connection', () => {
+        const c = nav('connection');
+        return c && { type: c.effectiveType, downlink: c.downlink + 'Mbps', rtt: c.rtt + 'ms', saveData: c.saveData };
+      }],
+      ['storage.estimate', async () => {
+        if (!nav('storage') || !navigator.storage.estimate) return undefined;
+        const e = await navigator.storage.estimate();
+        return { quota: (e.quota / 1073741824).toFixed(2) + ' GB', usage: (e.usage / 1048576).toFixed(1) + ' MB' };
+      }, { sec: true }],
+      ['WebGL renderer (GPU)', () => {
+        const c = document.createElement('canvas');
+        const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+        if (!gl) return undefined;
+        const d = gl.getExtension('WEBGL_debug_renderer_info');
+        if (!d) return '(WEBGL_debug_renderer_info 차단됨)';
+        return gl.getParameter(d.UNMASKED_VENDOR_WEBGL) + ' — ' + gl.getParameter(d.UNMASKED_RENDERER_WEBGL);
+      }],
+      ['WebGPU adapter', async () => {
+        if (!nav('gpu')) return undefined;
+        const a = await navigator.gpu.requestAdapter();
+        if (!a) return '(어댑터 없음)';
+        const i = a.info || {};
+        return { vendor: i.vendor, arch: i.architecture, features: a.features.size + '개' };
+      }, { sec: true }],
+      ['AudioContext', () => {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return undefined;
+        const a = new AC();
+        const r = a.sampleRate + 'Hz · out ' + a.destination.maxChannelCount + 'ch';
+        a.close();
+        return r;
+      }],
+      ['battery', async () => {
+        if (!navigator.getBattery) return undefined;
+        const b = await navigator.getBattery();
+        return { level: Math.round(b.level * 100) + '%', charging: b.charging };
+      }, { sec: true }]
+    ]
+  },
+  {
+    id: 'F', title: 'F · 선호 · 권한',
+    note: '권한은 상태만 조회 — 팝업 없음',
+    items: [
+      ['color-scheme', () => mq('(prefers-color-scheme: dark)') ? 'dark' : 'light'],
+      ['reduced-motion', () => mq('(prefers-reduced-motion: reduce)') ? 'reduce' : 'no-preference'],
+      ['contrast', () => mq('(prefers-contrast: more)') || mq('(prefers-contrast: less)') || 'no-preference'],
+      ['reduced-transparency', () => mq('(prefers-reduced-transparency: reduce)') ? 'reduce' : 'no-preference'],
+      ['forced-colors', () => mq('(forced-colors: active)') ? 'active' : 'none'],
+      ['inverted-colors', () => mq('(inverted-colors: inverted)') ? 'inverted' : 'none'],
+      ['pointer / hover', () => (mq('(any-pointer: fine)') ? 'fine' : mq('(any-pointer: coarse)') ? 'coarse' : 'none')
+        + ' / ' + (mq('(any-hover: hover)') ? 'hover' : 'none')],
+      ['dynamic-range', () => mq('(dynamic-range: high)') ? 'high (HDR)' : 'standard'],
+      ['cookieEnabled', () => nav('cookieEnabled')],
+      ['doNotTrack', () => nav('doNotTrack')],
+      ['globalPrivacyControl', () => nav('globalPrivacyControl')],
+      ['Notification.permission', () => window.Notification && Notification.permission],
+      ['permissions (상태만)', async () => {
+        if (!nav('permissions')) return undefined;
+        const names = ['geolocation', 'camera', 'microphone', 'notifications', 'clipboard-read'];
+        const out = {};
+        for (const n of names) {
+          try { out[n] = (await navigator.permissions.query({ name: n })).state; }
+          catch (e) { out[n] = '조회불가'; }
+        }
+        return out;
+      }]
+    ]
+  },
+  {
+    id: 'G', title: 'G · 유입 · 세션',
+    items: [
+      ['referrer', () => document.referrer],
+      ['query string', () => location.search],
+      ['navigation type', () => {
+        const e = performance.getEntriesByType('navigation')[0];
+        return e && e.type;
+      }],
+      ['회선 타이밍', () => {
+        const e = performance.getEntriesByType('navigation')[0];
+        if (!e) return undefined;
+        const r = n => Math.round(n) + 'ms';
+        return {
+          dns: r(e.domainLookupEnd - e.domainLookupStart),
+          tcp: r(e.connectEnd - e.connectStart),
+          ttfb: r(e.responseStart - e.requestStart),
+          load: r(e.duration)
+        };
+      }],
+      ['protocol', () => location.protocol + ' · ' + (performance.getEntriesByType('navigation')[0] || {}).nextHopProtocol]
+    ]
+  },
+  {
+    id: 'H', title: 'H · 지문 계열',
+    note: '식별력이 높은 항목 — 노출 판단 주의',
+    items: [
+      ['설치 폰트 (렌더 폭 측정)', () => {
+        const list = ['Apple SD Gothic Neo', 'Pretendard', 'Helvetica Neue', 'Malgun Gothic',
+          'Segoe UI', 'Gulim', 'Batang', 'Roboto', 'Noto Sans CJK KR', 'Ubuntu'];
+        const found = list.filter(fontAvailable);
+        return found.length ? found.join(', ') : '(탐지 0 — 측정 실패 가능)';
+      }],
+      ['canvas 지문', () => {
+        const c = document.createElement('canvas');
+        c.width = 200; c.height = 40;
+        const x = c.getContext('2d');
+        if (!x) return undefined;
+        x.textBaseline = 'top';
+        x.font = "16px 'Arial'";
+        x.fillStyle = '#f60'; x.fillRect(0, 0, 100, 20);
+        x.fillStyle = 'rgba(0,80,200,0.7)'; x.fillText('probe 지문 \u{1F4DE}', 4, 4);
+        const d = c.toDataURL();
+        return hash32(d) + ' (len ' + d.length + ')';
+      }],
+      ['mediaDevices', async () => {
+        if (!nav('mediaDevices') || !navigator.mediaDevices.enumerateDevices) return undefined;
+        const ds = await navigator.mediaDevices.enumerateDevices();
+        const by = {};
+        ds.forEach(d => { by[d.kind] = (by[d.kind] || 0) + 1; });
+        const labeled = ds.filter(d => d.label).length;
+        return Object.keys(by).length
+          ? Object.entries(by).map(([k, v]) => k + ' ' + v).join(', ') + ' · label 노출 ' + labeled + '개'
+          : '(0개)';
+      }, { sec: true }],
+      ['speech voices', async () => {
+        if (!window.speechSynthesis) return undefined;
+        let vs = speechSynthesis.getVoices();
+        if (!vs.length) {                            // 일부 브라우저는 비동기로 채운다
+          await new Promise(r => {
+            const t = setTimeout(r, 800);
+            speechSynthesis.onvoiceschanged = () => { clearTimeout(t); r(); };
+          });
+          vs = speechSynthesis.getVoices();
+        }
+        if (!vs.length) return '(0개)';
+        const langs = [...new Set(vs.map(v => v.lang))];
+        return vs.length + '개 · ' + langs.length + '개 언어 (' + langs.slice(0, 5).join(', ') + '…)';
+      }],
+      ['storage 가용성', () => {
+        const t = k => { try { window[k].setItem('_p', '1'); window[k].removeItem('_p'); return true; } catch (e) { return false; } };
+        return 'local ' + t('localStorage') + ' · session ' + t('sessionStorage') + ' · idb ' + !!window.indexedDB;
+      }],
+      ['JS 엔진 힌트', () => {
+        const h = [];
+        if (window.chrome) h.push('window.chrome');
+        if (window.safari) h.push('window.safari');
+        if ('InstallTrigger' in window) h.push('InstallTrigger(FF)');
+        if (CSS.supports('-webkit-touch-callout', 'none')) h.push('-webkit-touch-callout(iOS)');
+        if (CSS.supports('-moz-appearance', 'none')) h.push('-moz-appearance(Gecko)');
+        return h.length ? h.join(', ') : '(없음)';
+      }]
+    ]
+  }
+];
+
+/* ═══ 렌더 ═════════════════════════════════════════════════════════ */
+
+// secure context 배지 — 폰 LAN 실측 시의 오독 방지가 목적
+const ctx = document.getElementById('ctx');
+ctx.className = SECURE ? 'secure' : 'insecure';
+ctx.innerHTML = SECURE
+  ? '<b>secure context ✔</b> — 모든 API 가 정상 조건입니다. <code>' + location.origin + '</code>'
+  : '<b>secure context ✘</b> — <code>' + location.origin + '</code> 는 비보안 컨텍스트입니다.<br>'
+  + '<code>sec</code> 표시 항목은 <b>지원 여부와 무관하게 막힙니다.</b> '
+  + '이 화면의 값을 실측표에 옮길 때 <code>non-secure</code> 꼬리표를 달고, '
+  + '데스크톱 <code>localhost</code> 값을 기준선으로 쓰세요.';
+
+const container = document.getElementById('groups');
+
+for (const g of GROUPS) {
+  const box = document.createElement('div');
+  box.className = 'g' + (g.leak ? ' leak' : '');
+  const head = document.createElement('h2');
+  head.innerHTML = '<span>' + g.title + '</span>'
+    + (g.note ? '<span class="n">' + g.note + '</span>' : '');
+  const table = document.createElement('table');
+  box.append(head, table);
+  container.append(box);
+
+  DUMP[g.id] = {};
+
+  // 그룹별 병렬 — 느린 ipapi 가 나머지를 붙잡지 않게 한다
+  (async () => {
+    for (const [key, getter, opts] of g.items) {
+      const o = opts || {};
+      const tr = document.createElement('tr');
+      const td1 = document.createElement('td');
+      td1.className = 'k';
+      td1.innerHTML = key + (o.sec ? ' <span class="sec">sec</span>' : '');
+      const td2 = document.createElement('td');
+      td2.className = 'v pend';
+      td2.textContent = '…';
+      tr.append(td1, td2);
+      table.append(tr);
+
+      const v = await val(getter);
+      const c = classify(v, o.sec);
+      td2.className = 'v ' + c.cls;
+      td2.innerHTML = '<span class="m">' + c.m + '</span>';
+      td2.append(document.createTextNode(c.t));
+      DUMP[g.id][key] = (v && v.__err) ? { error: v.__err } : (v === undefined ? null : v);
+    }
+  })();
+}
+
+/* ── 하단 바: JSON 복사 + 체류시간 ──────────────────────────────── */
+const t0 = Date.now();
+const elapsed = document.getElementById('elapsed');
+setInterval(() => {
+  const s = Math.round((Date.now() - t0) / 1000);
+  elapsed.textContent = '체류 ' + s + 's';
+}, 1000);
+
+document.getElementById('copy').onclick = async () => {
+  const payload = JSON.stringify({
+    _probe: 'bksh-phone visitor probe',
+    _secureContext: SECURE,
+    _origin: location.origin,
+    _capturedAt: new Date().toISOString(),
+    ...DUMP
+  }, null, 2);
+
+  let ok = false;
+  try {                                   // clipboard API 는 secure context 전용
+    await navigator.clipboard.writeText(payload);
+    ok = true;
+  } catch (e) {                            // 폰 LAN(http) 실측용 폴백
+    const ta = document.createElement('textarea');
+    ta.value = payload;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+    document.body.append(ta);
+    ta.select();
+    try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
+    ta.remove();
+  }
+
+  const badge = document.getElementById('copied');
+  badge.textContent = ok ? '복사됨' : '복사 실패 — 콘솔에 출력';
+  badge.style.color = ok ? '#6fbf7c' : '#d9a95c';
+  badge.style.opacity = 1;
+  setTimeout(() => { badge.style.opacity = 0; }, 2000);
+  if (!ok) console.log(payload);
+};
 </script>
+</body>
+</html>
