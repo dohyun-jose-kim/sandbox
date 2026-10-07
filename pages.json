@@ -1,0 +1,20 @@
+{
+  "hub": { "path": "/sandbox/", "ko": "실험장 허브 — 노을빛 모래밭", "en": "Sandbox — a sunset playground of experiments" },
+  "pages": [
+    { "path": "/sandbox/wallpaper/", "ko": "월페이퍼 — 애스트로노미", "en": "Wallpaper — astronomy" },
+    { "path": "/sandbox/bksh-clock/", "ko": "공사중", "en": "under construction" },
+    { "path": "/sandbox/bksh-plant/", "ko": "이끼 — 커서 근접 성장 (Three.js)", "en": "moss — proximity growth (Three.js)" },
+    { "path": "/sandbox/bksh-books/", "ko": "공사중", "en": "under construction" },
+    { "path": "/sandbox/bksh-phone/", "ko": "공사중", "en": "under construction" },
+    { "path": "/sandbox/bksh-blog/", "ko": "블로그 자리 — 공사중", "en": "blog-to-be — under construction" },
+    { "path": "/sandbox/bksh-bottles/", "ko": "잉크 번짐 — 墨流し 유체 시뮬레이션", "en": "ink bleed — 墨流し fluid simulation" },
+    { "path": "/sandbox/bksh-reads/", "ko": "공사중", "en": "under construction" },
+    { "path": "/sandbox/desk/", "ko": "공사중", "en": "under construction" },
+    { "path": "/sandbox/desk-pot/", "ko": "공사중", "en": "under construction" },
+    { "path": "/sandbox/desk-coffee/", "ko": "공사중", "en": "under construction" },
+    { "path": "/sandbox/sand-cap/", "ko": "공사중", "en": "under construction" },
+    { "path": "/sandbox/sand-build/", "ko": "랜딩 연출 스터디 — 스플릿 텍스트·마퀴", "en": "animated landing study — split text & marquee" },
+    { "path": "/sandbox/sand-dig/", "ko": "공사중", "en": "under construction" },
+    { "path": "/sandbox/sand-rainbow/", "ko": "레인보우 자리 — 공사중", "en": "rainbow-to-be — under construction" }
+  ]
+}

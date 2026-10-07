@@ -38,6 +38,10 @@ jobs:
           for d in sections/*/; do
             cp -r "$d" "_site/$(basename "$d")"
           done
+          # page list = single source of truth: the blog's /sitemap/ page fetches
+          # /sandbox/pages.json, and the root sitemap index points at /sandbox/sitemap.xml
+          cp pages.json _site/pages.json
+          node scripts/sitemap.mjs > _site/sitemap.xml
 
       - uses: actions/configure-pages@v5
         with:
